@@ -105,8 +105,15 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # continue-on-error, then re-raised at the end: a publish failure (usually a
+      # missing trusted-publisher config) must not skip the .mcpb and the release,
+      # which authenticate with this repo's own GITHUB_TOKEN and would otherwise
+      # be collateral damage. The verify step above still aborts the job outright,
+      # so nothing can be released on a version mismatch.
       - name: Publish to npm
+        id: npm
         if: steps.need.outputs.npm == 'true'
+        continue-on-error: true
         run: npm publish --access public
 
       # The .mcpb is a zip of manifest.json + the bundle + its runtime deps, so
@@ -135,3 +142,10 @@ jobs:
           **Claude Desktop** — download \`poc-mcp.mcpb\` below and double-click it.
 
           npm: https://www.npmjs.com/package/$PKG/v/$VERSION"
+
+      # Re-raise the publish failure now that the release is safely out.
+      - name: Report the npm publish failure
+        if: steps.npm.outcome == 'failure'
+        run: |
+          echo "::error::npm publish failed. The usual cause is a missing trusted publisher: npmjs.com → the package → Settings → Trusted publisher → zerohuman-ai / poc-mcp / publish.yml. Fix it and re-run this workflow; the release above is already done and will be left alone."
+          exit 1

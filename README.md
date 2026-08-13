@@ -64,15 +64,27 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
 | :--- | :--- | :--- | :--- |
 | `--token <TOKEN>` | `POC_MCP_TOKEN` | — | 必填。 |
 | `--device <ID>` | `POC_MCP_DEVICE_ID` | — | 預設機器。token 只綁一台時可省略。 |
-| `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` 只留截圖與操控相關的 11 個 tool。 |
+| `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` 只留截圖與操控相關的 12 個 tool。 |
 | `--readonly` | `POC_MCP_READONLY` | 關 | 隱藏所有會改動機器的 tool。 |
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | 關 | 開放 `send_raw_message`。 |
 | `--idle-timeout <秒>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | 這麼久沒有 tool 呼叫就斷線。`0` = 永不主動斷。 |
 | `--screenshot-max-edge <px>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | 截圖長邊縮到這個大小。`0` = 原生解析度。 |
 | `--api-base <URL>` | `POC_MCP_API_BASE` | 正式站 | 覆寫後端位址。 |
+| `--inspector` | `POC_MCP_INSPECTOR` | 關 | 開本機的 inspector 頁面，見下。 |
+| `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector 的埠號，只綁 127.0.0.1。 |
 
 如果覺得 AI 容易分心，可以試 `--profile core`：tool 清單短一點，模型挑對動作的
 機率明顯較高。
+
+### Inspector
+
+加 `--inspector` 會在 `http://127.0.0.1:7333` 開一個頁面，把 AI 收到的每一張截圖
+連同它點的、拖的位置一起標出來，旁邊是它呼叫過什麼的即時紀錄。你也可以直接在那個
+頁面自己操控機器。網址固定，可以加書籤。
+
+預設關閉：一個 stdio server 悄悄佔一個埠很奇怪，而且同時開兩個 MCP 連線會互搶。
+那個埠只聽 127.0.0.1，跨來源請求會被拒絕，寫入還要求一個其他網站設不出來的自訂
+header。
 
 ---
 
@@ -93,6 +105,7 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
 | `screenshot` | 目前畫面的 PNG，附帶像素尺寸。可選 `crop`、`max_edge`、`quality`。 |
 | `get_screen_size` | 機器螢幕的像素尺寸。僅供參考，算座標不需要它。 |
 | `get_pixel_color` | 單一像素的 RGB 與 hex。只想確認某一點有沒有變色時比截圖便宜。 |
+| `review_last_screen_touch` | 回傳 AI 上次碰螢幕時「牠當時看的那張截圖」，並在座標實際落點畫上十字（滑動的話連軌跡與終點一起畫），還會告訴牠那張圖跟那個動作之間隔了多久。動作沒生效時，這能直接回答「是座標算錯，還是畫面早就換了」，而且不用連線到機器。**0.2.1 新增。** |
 
 ### 操控
 

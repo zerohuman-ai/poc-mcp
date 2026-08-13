@@ -69,15 +69,29 @@ Every option is available as a flag or an environment variable. Flags win.
 | :--- | :--- | :--- | :--- |
 | `--token <TOKEN>` | `POC_MCP_TOKEN` | — | Required. |
 | `--device <ID>` | `POC_MCP_DEVICE_ID` | — | Default device. Optional if the token covers exactly one device. |
-| `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` keeps only the 11 screenshot/input tools. |
+| `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` keeps only the 12 screenshot/input tools. |
 | `--readonly` | `POC_MCP_READONLY` | off | Hides every tool that can change the device. |
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | off | Exposes `send_raw_message`. |
 | `--idle-timeout <SECONDS>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | Disconnect after this long with no tool call. `0` never disconnects. |
 | `--screenshot-max-edge <PX>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | Downscale screenshots to this longest edge. `0` sends native resolution. |
 | `--api-base <URL>` | `POC_MCP_API_BASE` | production | Override the backend endpoint. |
+| `--inspector` | `POC_MCP_INSPECTOR` | off | Serve the local inspector page — see below. |
+| `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector port. Bound to 127.0.0.1 only. |
 
 `--profile core` is worth trying if the agent seems to lose focus: a shorter tool
 list measurably helps models pick the right action.
+
+### The inspector
+
+`--inspector` serves a page on `http://127.0.0.1:7333` that shows every
+screenshot the agent received with its taps and swipes drawn on top, plus a live
+log of what it called. You can also drive the device yourself from that page. The
+URL is stable, so it is safe to bookmark.
+
+It is off by default: a stdio server quietly binding a port is surprising, and
+two MCP sessions would fight over it. The port listens on 127.0.0.1 only,
+cross-origin requests are refused, and writes require a custom header that other
+websites cannot set.
 
 ---
 
@@ -100,6 +114,7 @@ screen 100 units of vertical travel covers more of the screen than 100 horizonta
 | `screenshot` | PNG of the current screen, plus its pixel dimensions. Optional `crop`, `max_edge`, `quality`. |
 | `get_screen_size` | Device screen size in pixels. Informational only — not needed for coordinates. |
 | `get_pixel_color` | RGB and hex of one pixel. Cheaper than a screenshot for checking a single change. |
+| `review_last_screen_touch` | The screenshot the agent was looking at when it last touched the screen, with a crosshair on where the coordinate actually landed — for a swipe, the path and end point too — and how much time passed between that screenshot and the action. Answers "was my coordinate wrong, or had the screen already moved?" without a device round trip. **New in 0.2.1.** |
 
 ### Input
 

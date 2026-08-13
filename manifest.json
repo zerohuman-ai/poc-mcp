@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "phoneoncloud",
   "display_name": "PhoneOnCloud",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Screenshot and control a cloud-hosted Android device.",
   "long_description": "Connects Claude Desktop to a PhoneOnCloud Android device over a peer-to-peer WebRTC data channel. Take screenshots, tap, swipe, type, read and write files, install APKs, simulate GPS, and run automation scripts. Screenshots and control traffic go directly between your machine and the device — they do not pass through PhoneOnCloud servers.",
   "author": {
