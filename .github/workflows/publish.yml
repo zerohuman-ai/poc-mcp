@@ -59,6 +59,14 @@ jobs:
             }
           '
 
+      # werift is the one dependency the bundle does not inline, so a bare clone
+      # cannot execute dist/index.js until it is installed. Consumers never hit
+      # this — npm and npx install it for them — but the next step runs the
+      # bundle for real, which makes this both a prerequisite and a smoke test
+      # that the published artifact starts in a clean environment.
+      - name: Install the runtime dependency
+        run: npm install --omit=dev --no-audit --no-fund --no-package-lock
+
       # A committed dist can drift from a bumped package.json. The bundle knows
       # its own version, so make all three agree before anything is published:
       # a mismatch means dist/ was not rebuilt.
