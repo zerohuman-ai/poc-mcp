@@ -12,21 +12,13 @@
   "homepage": "https://poc200.web.app",
   "documentation": "https://github.com/zerohuman-ai/poc-mcp#readme",
   "license": "MIT",
-  "keywords": [
-    "android",
-    "automation",
-    "webrtc",
-    "device",
-    "mobile"
-  ],
+  "keywords": ["android", "automation", "webrtc", "device", "mobile"],
   "server": {
     "type": "node",
     "entry_point": "server/index.js",
     "mcp_config": {
       "command": "node",
-      "args": [
-        "${__dirname}/server/index.js"
-      ],
+      "args": ["${__dirname}/server/index.js"],
       "env": {
         "POC_MCP_TOKEN": "${user_config.token}",
         "POC_MCP_DEVICE_ID": "${user_config.device_id}",
