@@ -25877,7 +25877,7 @@ async function main() {
 var HELP = `phoneoncloud-mcp ${SERVER_VERSION} \u2014 MCP server for PhoneOnCloud Android devices
 
 Usage:
-  npx -y @poc/mcp --token <TOKEN> [--device <DEVICE_ID>]
+  npx -y @zerohuman-ai/poc-mcp --token <TOKEN> [--device <DEVICE_ID>]
 
 Options:
   --token <TOKEN>              MCP token from the web UI (or POC_MCP_TOKEN)

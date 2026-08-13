@@ -29,7 +29,7 @@ Token 開頭是 `poc_mcp_`。把它當密碼看：在到期之前，它對你選
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -- npx -y @poc/mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
 ```
 
 ### Claude Desktop
@@ -44,7 +44,7 @@ token，並存進作業系統的 keychain。
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@poc/mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
+      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
     }
   }
 }

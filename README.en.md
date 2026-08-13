@@ -32,7 +32,7 @@ Requires **Node.js 18 or newer**.
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -- npx -y @poc/mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
 ```
 
 ### Claude Desktop
@@ -48,7 +48,7 @@ keychain.
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@poc/mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
+      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
     }
   }
 }
