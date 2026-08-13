@@ -1,0 +1,38 @@
+{
+  "name": "@poc/mcp",
+  "version": "0.2.0",
+  "description": "MCP server for PhoneOnCloud — screenshot and control a cloud Android device from any AI agent",
+  "license": "MIT",
+  "homepage": "https://poc200.web.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zerohuman-ai/poc-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zerohuman-ai/poc-mcp/issues"
+  },
+  "type": "module",
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "android",
+    "automation",
+    "webrtc",
+    "phoneoncloud"
+  ],
+  "bin": {
+    "poc-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "werift": "^0.22.2"
+  }
+}
