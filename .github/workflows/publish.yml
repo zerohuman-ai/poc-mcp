@@ -1,0 +1,129 @@
+# Publish this package to npm and cut a release when the version changes.
+#
+# This repo holds the built server, so there is nothing to compile: what is
+# committed here is exactly what gets published. Push a new version to main and
+# this runs.
+#
+# Both guards are independent, so a re-run repairs a half-finished release
+# instead of doing nothing:
+#   - npm publish runs only when this version is not on the registry yet
+#   - the release runs only when its tag has no release yet
+#
+# Authentication is OIDC (npm trusted publishing) — no npm token lives here.
+# Because this repo is public, npm also generates provenance, which is the
+# strongest guarantee available for a package that ships a bundled file: it ties
+# the tarball to this repo and this commit.
+#
+# One-time setup:
+#   npmjs.com → @zerohuman-ai/poc-mcp → Settings → Trusted publisher →
+#     organization  zerohuman-ai
+#     repository    poc-mcp
+#     workflow      publish.yml
+#
+# This file is generated. Edit it in the monorepo at
+# apps/mcp/public-repo/.github/workflows/publish.yml and re-run
+# `npm run pack:public` — editing it here will be overwritten.
+name: publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC for npm trusted publishing + provenance
+      contents: write # create the GitHub release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org" # required for OIDC
+
+      - name: Check toolchain
+        run: |
+          node -v && npm -v
+          NPMV=$(npm -v) node -e '
+            const [a, b, c] = process.env.NPMV.split(".").map(Number);
+            if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) {
+              console.error(`trusted publishing needs npm >= 11.5.1, got ${process.env.NPMV}`);
+              process.exit(1);
+            }
+          '
+
+      # A committed dist can drift from a bumped package.json. The bundle knows
+      # its own version, so make all three agree before anything is published:
+      # a mismatch means dist/ was not rebuilt.
+      - name: Verify the committed bundle
+        id: v
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          MANIFEST=$(node -p "require('./manifest.json').version")
+          # --version writes to stderr: stdout is the JSON-RPC channel. No pipe
+          # here — these steps run with pipefail, and a reader that exits early
+          # would turn a healthy bundle into a failed step.
+          BUNDLE=$(node dist/index.js --version 2>&1)
+          echo "package.json $VERSION | manifest.json $MANIFEST | dist/index.js $BUNDLE"
+          if [ "$VERSION" != "$MANIFEST" ] || [ "$VERSION" != "$BUNDLE" ]; then
+            echo "::error::version mismatch — rebuild dist/ and bump manifest.json together"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Decide what is needed
+        id: need
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if npm view "$(node -p "require('./package.json').name")@$VERSION" version >/dev/null 2>&1; then
+            echo "npm=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$VERSION is already on npm"
+          else
+            echo "npm=true" >> "$GITHUB_OUTPUT"
+          fi
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::release v$VERSION already exists"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.need.outputs.npm == 'true'
+        run: npm publish --access public
+
+      # The .mcpb is a zip of manifest.json + the bundle + its runtime deps, so
+      # it builds from this tree alone. Claude Desktop installs it by double-click.
+      - name: Build the .mcpb
+        if: steps.need.outputs.release == 'true'
+        run: node scripts/pack-mcpb.mjs
+
+      - name: Cut the release
+        if: steps.need.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          PKG=$(node -p "require('./package.json').name")
+          gh release create "v$VERSION" build/poc-mcp.mcpb \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes "**Claude Code**
+
+          \`\`\`bash
+          claude mcp add phoneoncloud -- npx -y $PKG --token poc_mcp_… --device <DEVICE_ID>
+          \`\`\`
+
+          **Claude Desktop** — download \`poc-mcp.mcpb\` below and double-click it.
+
+          npm: https://www.npmjs.com/package/$PKG/v/$VERSION"

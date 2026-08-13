@@ -1,0 +1,73 @@
+{
+  "manifest_version": "0.2",
+  "name": "phoneoncloud",
+  "display_name": "PhoneOnCloud",
+  "version": "0.2.0",
+  "description": "Screenshot and control a cloud-hosted Android device.",
+  "long_description": "Connects Claude Desktop to a PhoneOnCloud Android device over a peer-to-peer WebRTC data channel. Take screenshots, tap, swipe, type, read and write files, install APKs, simulate GPS, and run automation scripts. Screenshots and control traffic go directly between your machine and the device — they do not pass through PhoneOnCloud servers.",
+  "author": {
+    "name": "PhoneOnCloud",
+    "url": "https://poc200.web.app"
+  },
+  "homepage": "https://poc200.web.app",
+  "documentation": "https://github.com/zerohuman-ai/poc-mcp#readme",
+  "license": "MIT",
+  "keywords": [
+    "android",
+    "automation",
+    "webrtc",
+    "device",
+    "mobile"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "POC_MCP_TOKEN": "${user_config.token}",
+        "POC_MCP_DEVICE_ID": "${user_config.device_id}",
+        "POC_MCP_PROFILE": "${user_config.profile}",
+        "POC_MCP_READONLY": "${user_config.read_only}"
+      }
+    }
+  },
+  "user_config": {
+    "token": {
+      "type": "string",
+      "title": "MCP Token",
+      "description": "Generate one at poc200.web.app → your device → Settings → AI / MCP. It is shown only once.",
+      "sensitive": true,
+      "required": true
+    },
+    "device_id": {
+      "type": "string",
+      "title": "Device ID",
+      "description": "Which device to control by default. Leave empty if the token covers exactly one device.",
+      "required": false
+    },
+    "profile": {
+      "type": "string",
+      "title": "Tool set",
+      "description": "\"full\" exposes every tool; \"core\" keeps only screenshot and input tools, which helps the model stay focused.",
+      "default": "full",
+      "required": false
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only mode",
+      "description": "Allow screenshots and reads, but block anything that changes the device.",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "tools_generated": true
+}

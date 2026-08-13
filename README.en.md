@@ -37,9 +37,10 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
 
 ### Claude Desktop
 
-Download `poc-mcp.mcpb` from the **AI / MCP** panel and double-click it.
-Claude Desktop asks for your token and stores it in your operating system's
-keychain.
+Download `poc-mcp.mcpb` from the **AI / MCP** panel — or from the
+[latest release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) — and
+double-click it. Claude Desktop asks for your token and stores it in your
+operating system's keychain.
 
 ### Codex, Cursor, and other JSON-configured clients
 

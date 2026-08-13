@@ -34,8 +34,9 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
 
 ### Claude Desktop
 
-在 **AI / MCP** 面板下載 `poc-mcp.mcpb`，雙擊安裝。Claude Desktop 會跳出來問你的
-token，並存進作業系統的 keychain。
+在 **AI / MCP** 面板下載 `poc-mcp.mcpb`（也可以到
+[最新 release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) 抓），雙擊
+安裝。Claude Desktop 會跳出來問你的 token，並存進作業系統的 keychain。
 
 ### Codex、Cursor 與其他吃 JSON 設定的工具
 
