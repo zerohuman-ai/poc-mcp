@@ -1,6 +1,6 @@
 {
   "name": "@zerohuman-ai/poc-mcp",
-  "version": "0.2.1",
+  "version": "0.3.1",
   "description": "MCP server for PhoneOnCloud — screenshot and control a cloud Android device from any AI agent",
   "license": "MIT",
   "homepage": "https://poc200.web.app",

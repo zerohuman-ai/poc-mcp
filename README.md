@@ -136,9 +136,8 @@ header。
 
 | Tool | 功能 |
 | :--- | :--- |
-| `run_script` | 用名稱或直接給原始碼執行自動化腳本，並收集幾秒的輸出。 |
+| `run_script` | 給 ES5 原始碼（`content`）直接在裝置上執行，並收集幾秒的輸出。 |
 | `stop_script` | 停掉正在跑的腳本。 |
-| `script_control` | `start_auto`、`reload`、`update_config`。 |
 | `set_location` | 設定絕對的模擬 GPS 座標。 |
 | `move_location` | 以公尺或度數位移模擬座標。 |
 

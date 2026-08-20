@@ -145,9 +145,8 @@ screen 100 units of vertical travel covers more of the screen than 100 horizonta
 
 | Tool | What it does |
 | :--- | :--- |
-| `run_script` | Run an automation script by name or by source. Collects output for a few seconds. |
+| `run_script` | Run ES5 JavaScript source (`content`) directly on the device. Collects output for a few seconds. |
 | `stop_script` | Stop the running script. |
-| `script_control` | `start_auto`, `reload`, or `update_config`. |
 | `set_location` | Set an absolute simulated GPS position. |
 | `move_location` | Move the simulated position by metres or degrees. |
 
