@@ -82,6 +82,11 @@ var require_messages = __commonJS({
       "deleteFile",
       "gps",
       "gpsDelta",
+      "sensors",
+      "cameraSetImage",
+      "cameraClear",
+      "cameraLive",
+      "cameraGetState",
       "checkApkExists",
       "installApk",
       "aiEnvStatus",
@@ -107,6 +112,8 @@ var require_messages = __commonJS({
       deleteFile: "deleteFileResponse",
       checkApkExists: "checkApkExistsResponse",
       installApk: "installApkResponse",
+      cameraSetImage: "cameraSetImageResponse",
+      cameraGetState: "cameraState",
       aiEnvStatus: "aiEnvStatusResponse",
       aiList: "aiListResponse",
       aiStart: "aiStarted",
@@ -147,7 +154,7 @@ var require_signaling = __commonJS({
   "../../packages/device-protocol/dist/signaling.js"(exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.H265_CODEC_PARAMS = exports.ICE_SERVERS = exports.OFFER_PATCH_FIELD_PATHS = exports.SIGNALING = void 0;
+    exports.H265_CODEC_PARAMS = exports.ICE_SERVERS = exports.OFFER_PATCH_FIELD_PATHS = exports.CLIENT_SIGNALING = exports.SIGNALING = void 0;
     exports.encodeSessionDescription = encodeSessionDescription2;
     exports.decodeSessionDescription = decodeSessionDescription2;
     exports.buildOfferPatchBody = buildOfferPatchBody;
@@ -197,6 +204,12 @@ var require_signaling = __commonJS({
       POLL_INTERVAL_MS: 1e3,
       POLL_MAX_ATTEMPTS: 30,
       CLIENT_SESSION_EXPIRY_MS: 4e4
+    };
+    exports.CLIENT_SIGNALING = {
+      SUBCOLLECTION: "clients",
+      FIELD_DEVICE_API_VERSION: "deviceApiVersion",
+      FIELD_PRESENCE: "presence",
+      PER_CLIENT_MIN_VERSION: 2
     };
     exports.OFFER_PATCH_FIELD_PATHS = [
       exports.SIGNALING.FIELD_CLIENT_SESSION,
@@ -293,6 +306,38 @@ var require_chunks = __commonJS({
   }
 });
 
+// ../../packages/device-protocol/dist/env.js
+var require_env = __commonJS({
+  "../../packages/device-protocol/dist/env.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.DEFAULT_ENV = exports.ENV_PROFILES = void 0;
+    exports.resolveEnv = resolveEnv2;
+    exports.ENV_PROFILES = {
+      dev: {
+        firebaseProjectId: "phoneoncloud-prd",
+        firebaseApiKey: "AIzaSyBsXOh8EIW76QD4iGkyXeivmkIG4X58E40",
+        backendBaseUrl: "https://asia-east1-phoneoncloud-prd.cloudfunctions.net",
+        frontendUrl: "https://dev-app.cloudphonego.com"
+      },
+      prod: {
+        firebaseProjectId: "cloudphonego-prod",
+        firebaseApiKey: "AIzaSyDPpPXoPV5yyLtcbZZU1dkp3HMrtdkTLVc",
+        backendBaseUrl: "https://asia-east1-cloudphonego-prod.cloudfunctions.net",
+        frontendUrl: "https://app.cloudphonego.com"
+      }
+    };
+    exports.DEFAULT_ENV = "dev";
+    function resolveEnv2(value, source = "env") {
+      if (value === void 0 || value === "")
+        return exports.DEFAULT_ENV;
+      if (value === "dev" || value === "prod")
+        return value;
+      throw new Error(`Invalid ${source} ${JSON.stringify(value)}: expected "dev" or "prod" (or unset for ${exports.DEFAULT_ENV})`);
+    }
+  }
+});
+
 // ../../packages/device-protocol/dist/index.js
 var require_dist = __commonJS({
   "../../packages/device-protocol/dist/index.js"(exports) {
@@ -320,6 +365,7 @@ var require_dist = __commonJS({
     __exportStar(require_signaling(), exports);
     __exportStar(require_batch(), exports);
     __exportStar(require_chunks(), exports);
+    __exportStar(require_env(), exports);
   }
 });
 
@@ -7885,7 +7931,7 @@ var require_signaling2 = __commonJS({
     exports.firestoreBaseUrl = firestoreBaseUrl;
     exports.exchangeOfferForAnswer = exchangeOfferForAnswer;
     var device_protocol_1 = require_dist();
-    exports.FIRESTORE_PROJECT_ID = "phoneoncloud-prd";
+    exports.FIRESTORE_PROJECT_ID = device_protocol_1.ENV_PROFILES[device_protocol_1.DEFAULT_ENV].firebaseProjectId;
     var SignalingSupersededError = class extends Error {
       myClientTimestamp;
       seenClientTimestamp;
@@ -7897,7 +7943,10 @@ var require_signaling2 = __commonJS({
       }
     };
     exports.SignalingSupersededError = SignalingSupersededError;
-    function firestoreBaseUrl(projectId = exports.FIRESTORE_PROJECT_ID) {
+    function envProjectId() {
+      return device_protocol_1.ENV_PROFILES[(0, device_protocol_1.resolveEnv)(process.env.POC_ENV, "POC_ENV")].firebaseProjectId;
+    }
+    function firestoreBaseUrl(projectId = envProjectId()) {
       return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     }
     async function exchangeOfferForAnswer(opts) {
@@ -8641,7 +8690,7 @@ var require_client = __commonJS({
           }
         };
       }
-      /** pixel → normalized。pixel 表面（phone2.0 / poc-cli / vscode player）用。 */
+      /** pixel → normalized。pixel 表面（www / poc-cli / vscode player）用。 */
       touchMessage(action, x, y, pointerId) {
         return this.normTouchMessage(action, x / this.screenWidth, y / this.screenHeight, pointerId);
       }
@@ -8943,9 +8992,9 @@ var require_image_data = __commonJS({
   }
 });
 
-// cwasm-webp:/Users/jeremy/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js
+// cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js
 var require_webp = __commonJS({
-  "cwasm-webp:/Users/jeremy/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
+  "cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
     var fs = __require("fs");
     var path2 = __require("path");
     var ImageData = require_image_data();
@@ -17211,7 +17260,78 @@ var StdioServerTransport = class {
 };
 
 // src/config.ts
-var DEFAULT_API_BASE = "https://asia-east1-phoneoncloud-prd.cloudfunctions.net";
+var import_device_protocol = __toESM(require_dist(), 1);
+
+// src/token.ts
+var EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1e3;
+var TOKEN_PREFIX = "poc_mcp_";
+function decodeBase64Url(segment) {
+  try {
+    const padded = segment.replace(/-/g, "+").replace(/_/g, "/");
+    return Buffer.from(padded, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+function inspectToken(token, now = /* @__PURE__ */ new Date()) {
+  const blank = {
+    subject: null,
+    jti: null,
+    deviceIds: null,
+    scopes: [],
+    readonly: false,
+    expiresAt: null,
+    expired: false,
+    expiringSoon: false,
+    wellFormed: false
+  };
+  if (!token.startsWith(TOKEN_PREFIX)) return blank;
+  const parts = token.slice(TOKEN_PREFIX.length).split(".");
+  if (parts.length !== 3) return blank;
+  const json = decodeBase64Url(parts[1] ?? "");
+  if (!json) return blank;
+  let payload;
+  try {
+    payload = JSON.parse(json);
+  } catch {
+    return blank;
+  }
+  if (payload.typ !== "mcp") return blank;
+  const exp = typeof payload.exp === "number" ? new Date(payload.exp * 1e3) : null;
+  const msLeft = exp ? exp.getTime() - now.getTime() : Number.POSITIVE_INFINITY;
+  return {
+    subject: typeof payload.sub === "string" ? payload.sub : null,
+    jti: typeof payload.jti === "string" ? payload.jti : null,
+    deviceIds: Array.isArray(payload.dev) ? payload.dev.filter((d) => typeof d === "string") : null,
+    scopes: Array.isArray(payload.scp) ? payload.scp.filter((s) => typeof s === "string") : [],
+    readonly: payload.ro === true,
+    expiresAt: exp,
+    expired: msLeft <= 0,
+    expiringSoon: msLeft > 0 && msLeft <= EXPIRY_WARNING_MS,
+    wellFormed: true
+  };
+}
+var regenerateHint = () => `Generate a new one at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP, then update your MCP config.`;
+function describeTokenStatus(info, now = /* @__PURE__ */ new Date()) {
+  if (!info.wellFormed) {
+    return `Malformed MCP token. Check that it was copied in full (it starts with "${TOKEN_PREFIX}"). ${regenerateHint()}`;
+  }
+  if (!info.expiresAt) {
+    return "MCP token has no expiry recorded.";
+  }
+  const day = info.expiresAt.toISOString().slice(0, 10);
+  if (info.expired) {
+    return `Your PhoneOnCloud MCP token expired on ${day}. ${regenerateHint()}`;
+  }
+  const days = Math.max(0, Math.ceil((info.expiresAt.getTime() - now.getTime()) / 864e5));
+  if (info.expiringSoon) {
+    return `Your PhoneOnCloud MCP token expires on ${day} (in ${days} day(s)). ${regenerateHint()}`;
+  }
+  return `MCP token valid until ${day} (${days} day(s) left).`;
+}
+
+// src/config.ts
+var DEFAULT_API_BASE = import_device_protocol.ENV_PROFILES[import_device_protocol.DEFAULT_ENV].backendBaseUrl;
 var DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1e3;
 var DEFAULT_LOG_BUFFER_SIZE = 500;
 var DEFAULT_SCREENSHOT_MAX_EDGE = 0;
@@ -17219,6 +17339,13 @@ var DEFAULT_SCREENSHOT_FORMAT = "webp";
 var DEFAULT_INSPECTOR_PORT = 7333;
 var ConfigError = class extends Error {
 };
+function envProfile(env = process.env) {
+  try {
+    return import_device_protocol.ENV_PROFILES[(0, import_device_protocol.resolveEnv)(env.POC_ENV, "POC_ENV")];
+  } catch (err) {
+    throw new ConfigError(err.message);
+  }
+}
 function parseFlags(argv) {
   const out = /* @__PURE__ */ new Map();
   for (let i = 0; i < argv.length; i++) {
@@ -17257,11 +17384,14 @@ function intOr(value, fallback) {
 }
 function loadConfig(argv = process.argv.slice(2), env = process.env) {
   const flags = parseFlags(argv);
+  const pocEnv = envProfile(env);
   const localSocket = (flags.get("local-socket") ?? env.POC_MCP_LOCAL_SOCKET ?? "").trim() || null;
   const token = (flags.get("token") ?? env.POC_MCP_TOKEN ?? "").trim();
   if (!token && !localSocket) {
     throw new ConfigError(
-      "No MCP token. Pass --token poc_mcp_\u2026 or set POC_MCP_TOKEN.\nGenerate one at https://poc200.web.app \u2192 device \u2192 Settings \u2192 AI / MCP.\nIn-container agents can pass --local-socket /data/poc/mcp.sock instead."
+      `No MCP token. Pass --token poc_mcp_\u2026 or set POC_MCP_TOKEN.
+Generate one at ${pocEnv.frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP.
+In-container agents can pass --local-socket /data/poc/mcp.sock instead.`
     );
   }
   if (token && localSocket) {
@@ -17281,9 +17411,11 @@ function loadConfig(argv = process.argv.slice(2), env = process.env) {
   return {
     token,
     deviceId: deviceId || null,
-    apiBase: (flags.get("api-base") ?? env.POC_MCP_API_BASE ?? DEFAULT_API_BASE).replace(/\/+$/, ""),
+    apiBase: (flags.get("api-base") ?? env.POC_MCP_API_BASE ?? pocEnv.backendBaseUrl).replace(/\/+$/, ""),
     profile: rawProfile,
-    readOnly: truthy(flags.get("readonly") ?? env.POC_MCP_READONLY),
+    // A read-only token forces read-only mode: dropping --readonly from the
+    // config must not bring the mutating tools back.
+    readOnly: truthy(flags.get("readonly") ?? env.POC_MCP_READONLY) || !localSocket && inspectToken(token).readonly,
     unsafeRaw: truthy(flags.get("unsafe-raw") ?? env.POC_MCP_UNSAFE_RAW),
     idleTimeoutMs: idleSeconds * 1e3,
     logBufferSize: intOr(env.POC_MCP_LOG_BUFFER, DEFAULT_LOG_BUFFER_SIZE) || DEFAULT_LOG_BUFFER_SIZE,
@@ -22042,20 +22174,20 @@ var GuideClient = class {
     if (params.sort !== void 0) body.sort = params.sort;
     if (params.mine !== void 0) body.mine = params.mine;
     if (params.limit !== void 0) body.limit = params.limit;
-    return this.call("/listGuides", body);
+    return this.call("/http/listGuides", body);
   }
   async get(guideId, version2) {
     const body = { guideId };
     if (version2 !== void 0) body.version = version2;
-    return this.call("/getGuide", body);
+    return this.call("/http/getGuide", body);
   }
   async publish(payload) {
-    return this.call("/publishGuide", payload);
+    return this.call("/http/publishGuide", payload);
   }
 };
 
 // src/signaling.ts
-var import_device_protocol = __toESM(require_dist(), 1);
+var import_device_protocol2 = __toESM(require_dist(), 1);
 var McpApiError = class extends Error {
   code;
   status;
@@ -22120,9 +22252,9 @@ var SignalingClient = class {
     }
     return payload;
   }
-  /** GET /mcpDevices */
+  /** GET /mcp/mcpDevices */
   async listDevices() {
-    const out = await this.call("/mcpDevices", { method: "GET" });
+    const out = await this.call("/mcp/mcpDevices", { method: "GET" });
     return {
       devices: Array.isArray(out.devices) ? out.devices : [],
       scopes: Array.isArray(out.scopes) ? out.scopes : [],
@@ -22138,33 +22270,33 @@ var SignalingClient = class {
    * attempts is pointless once another client has taken over the document.
    */
   async exchangeOnce(deviceId, offer, signal) {
-    const connect = await this.call("/mcpConnect", {
+    const connect = await this.call("/mcp/mcpConnect", {
       method: "POST",
-      body: { deviceId, offer: (0, import_device_protocol.encodeSessionDescription)(offer) }
+      body: { deviceId, offer: (0, import_device_protocol2.encodeSessionDescription)(offer) }
     });
     const clientTimestamp = Number(connect.clientTimestamp);
     if (!Number.isFinite(clientTimestamp)) {
       throw new McpApiError("internal", 500, "Backend did not return a clientTimestamp.");
     }
-    for (let attempt = 0; attempt < import_device_protocol.SIGNALING.POLL_MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 0; attempt < import_device_protocol2.SIGNALING.POLL_MAX_ATTEMPTS; attempt++) {
       if (signal?.aborted) throw new Error("SDP exchange aborted");
-      await this.sleep(import_device_protocol.SIGNALING.POLL_INTERVAL_MS);
+      await this.sleep(import_device_protocol2.SIGNALING.POLL_INTERVAL_MS);
       if (signal?.aborted) throw new Error("SDP exchange aborted");
       const out = await this.call(
-        `/mcpPoll?deviceId=${encodeURIComponent(deviceId)}&clientTimestamp=${clientTimestamp}`,
+        `/mcp/mcpPoll?deviceId=${encodeURIComponent(deviceId)}&clientTimestamp=${clientTimestamp}`,
         { method: "GET" }
       );
       if (out.state === "superseded") {
         throw new SupersededError(Number(out.seenClientTimestamp ?? 0));
       }
       if (out.state === "ready" && typeof out.answer === "string" && out.answer) {
-        return (0, import_device_protocol.decodeSessionDescription)(out.answer);
+        return (0, import_device_protocol2.decodeSessionDescription)(out.answer);
       }
     }
     throw new McpApiError(
       "internal",
       504,
-      `Device ${deviceId} did not answer within ${import_device_protocol.SIGNALING.POLL_MAX_ATTEMPTS} seconds. It may be busy starting up; try again.`
+      `Device ${deviceId} did not answer within ${import_device_protocol2.SIGNALING.POLL_MAX_ATTEMPTS} seconds. It may be busy starting up; try again.`
     );
   }
 };
@@ -22189,7 +22321,7 @@ async function exchangeWithRetry(client, deviceId, offer, opts = {}) {
 }
 
 // src/tools/context.ts
-var deviceIdSchema = external_exports.string().optional().describe("Device to act on. Omit to use the server's default device.");
+var deviceIdSchema = external_exports.string().optional();
 function textResult(text) {
   return { content: [{ type: "text", text }] };
 }
@@ -22276,12 +22408,12 @@ function buildScreenshotNote(size, crop) {
   const orientation = size.width > size.height ? "Landscape" : "Portrait";
   const head = `${orientation} screen (${size.width}x${size.height}px). `;
   if (!crop) {
-    return head + "Coordinates for tap/swipe/scroll are 0-1000 proportional: read a target's position as a fraction of this image (halfway across = 500). Ignore the image's pixel size \u2014 no scaling needed. If you were given a coordinate table for this app, use it: this image is for deciding which state you are in, not for re-deriving a position the table already lists.";
+    return head + "tap/swipe/scroll take 0-1000 proportional coordinates: read a target as a fraction of this image (halfway across = 500), no scaling needed. Given a coordinate table for this app, use it \u2014 this image is for deciding state, not for re-deriving a listed position.";
   }
   const x2 = crop.x + crop.width;
   const y2 = crop.y + crop.height;
   const example = crop.x + 0.5 * crop.width;
-  return head + `CROPPED VIEW: this image covers x ${crop.x}-${x2}, y ${crop.y}-${y2} in screen coordinates (0-1000 proportional). Convert before tapping: a target halfway across this image is at screen x = ${crop.x} + 0.5 \xD7 ${crop.width} = ${example}.`;
+  return head + `CROPPED VIEW: covers screen x ${crop.x}-${x2}, y ${crop.y}-${y2} (0-1000 proportional). Convert before tapping: halfway across this image is screen x = ${crop.x} + 0.5 \xD7 ${crop.width} = ${example}.`;
 }
 function sniffImageMime(buf) {
   if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") {
@@ -22308,26 +22440,20 @@ function registerScreenTools(ctx) {
       "screenshot",
       {
         title: "Screenshot the device",
-        description: "Capture the Android device's screen as a PNG image. Take a screenshot before each interaction: you cannot see the screen otherwise. Coordinates for tap/swipe/scroll are 0-1000 proportional, so you do NOT need to scale anything when the image is downscaled \u2014 read a target's position as a fraction of the image. When a coordinate table for this app was provided, use the screenshot to decide which state you are in and which target to hit, then take that target's coordinate from the table. If this screenshot does not show what you expected after a tap or swipe, call `review_last_screen_touch`: it marks where that touch actually landed on the screenshot you decided from, which tells you whether your coordinate was wrong or the screen simply changed.",
+        description: "Capture the device screen. Screenshot before every interaction: you cannot see it otherwise. tap/swipe/scroll take 0-1000 proportional coordinates, so never scale for a downscaled image \u2014 read a target as a fraction of it. When a coordinate table for this app was provided, this image is only for deciding which state you are in; take the position from the table. If it does not show what you expected after an action, call `review_last_screen_touch`.",
         inputSchema: {
           device_id: deviceIdSchema,
           crop: external_exports.object({
-            x: ratioCoord("Left edge of the crop, 0-1000."),
-            y: ratioCoord("Top edge of the crop, 0-1000."),
-            width: ratioSpan("Crop width, 1-1000 (1000 = full screen width)."),
-            height: ratioSpan("Crop height, 1-1000 (1000 = full screen height).")
+            x: ratioCoord("Crop left, 0-1000."),
+            y: ratioCoord("Crop top, 0-1000."),
+            width: ratioSpan("Crop width, 1-1000 (1000 = full width)."),
+            height: ratioSpan("Crop height, 1-1000 (1000 = full height).")
           }).optional().describe(
-            "Crop region in 0-1000 proportional coordinates, applied before any resize. The top-right quarter is x:500, y:0, width:500, height:500."
+            "Crop in 0-1000 coordinates, before resize. Top-right quarter: x:500, y:0, width:500, height:500."
           ),
-          max_edge: external_exports.number().int().min(0).max(MAX_EDGE_LIMIT).optional().describe(
-            "Downscale so the longest edge is at most this many pixels. 0 disables downscaling. Larger values cost more tokens."
-          ),
-          quality: external_exports.number().int().min(1).max(100).optional().describe(
-            "Encoder quality, 1-100. Only meaningful for webp (PNG is lossless). Defaults to 80 for webp."
-          ),
-          format: external_exports.enum(["webp", "png"]).optional().describe(
-            "Image encoding. Defaults to webp, which is around ten times smaller than png for the same screen and costs the same number of tokens. Ask for png only when you need lossless pixels."
-          )
+          max_edge: external_exports.number().int().min(0).max(MAX_EDGE_LIMIT).optional().describe("Downscale the longest edge to this many pixels; 0 disables. Bigger costs more tokens."),
+          quality: external_exports.number().int().min(1).max(100).optional().describe("Encoder quality 1-100, webp only (png is lossless). Default 80."),
+          format: external_exports.enum(["webp", "png"]).optional().describe("webp (default, ~10x smaller than png at the same token cost) or png for lossless.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -22368,7 +22494,7 @@ function registerScreenTools(ctx) {
       "get_screen_size",
       {
         title: "Get screen size",
-        description: "Return the device screen size in pixels. Informational only \u2014 for checking the aspect ratio or confirming orientation after a rotate. You do NOT need this to compute coordinates: tap, swipe and scroll all use 0-1000 proportional coordinates.",
+        description: "Screen size in pixels. Informational only (aspect ratio, orientation after a rotate) \u2014 you do NOT need this for coordinates, which are 0-1000 proportional.",
         inputSchema: { device_id: deviceIdSchema },
         annotations: { readOnlyHint: true }
       },
@@ -22384,7 +22510,7 @@ function registerScreenTools(ctx) {
       "review_last_screen_touch",
       {
         title: "See where your last touch actually landed",
-        description: "Returns the screenshot you were looking at when you last touched the screen (tap, swipe or scroll), with a red crosshair drawn where your coordinate actually landed \u2014 for a swipe, the path and end point too \u2014 plus how long passed between that screenshot and the action. Use this when an action did not do what you expected and you cannot tell whether your coordinate was wrong or the screen had changed \u2014 it answers exactly that question. Needs no device round trip, so it is fast. It does return a full screenshot, so call it when you are stuck rather than after every tap.",
+        description: "Returns the screenshot you last acted on (tap, swipe or scroll) with a red crosshair where your coordinate actually landed \u2014 swipe path and end point too \u2014 plus the delay before the action. Answers whether your coordinate was wrong or the screen had changed. No device round trip, but it does return a full image: call it when stuck, rather than after every tap.",
         inputSchema: {},
         annotations: { readOnlyHint: true }
       },
@@ -22410,11 +22536,11 @@ function registerScreenTools(ctx) {
       "get_pixel_color",
       {
         title: "Get pixel colour",
-        description: "Read the RGB colour at a proportional coordinate (0-1000, same as tap). Cheaper than a screenshot when you only need to check whether something changed colour (a button enabling, a health bar draining).",
+        description: "RGB colour at a 0-1000 coordinate. Cheaper than a screenshot when you only need to know whether something changed colour (a button enabling, a bar draining).",
         inputSchema: {
           device_id: deviceIdSchema,
-          x: ratioCoord("Horizontal position: 0 = left edge, 1000 = right edge."),
-          y: ratioCoord("Vertical position: 0 = top edge, 1000 = bottom edge.")
+          x: ratioCoord("X, 0-1000."),
+          y: ratioCoord("Y, 0-1000.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -26780,7 +26906,7 @@ var ConnectionManager = class {
     }
     if (devices.length === 0) {
       throw new Error(
-        "This token has no reachable devices. Create one at https://poc200.web.app first."
+        `This token has no reachable devices. Create one at ${envProfile().frontendUrl} first.`
       );
     }
     const list = devices.map((d) => `  ${d.deviceId} \u2014 ${d.displayName} (${d.status})`).join("\n");
@@ -27681,72 +27807,6 @@ var LogBuffer = class {
   }
 };
 
-// src/token.ts
-var EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1e3;
-var TOKEN_PREFIX = "poc_mcp_";
-function decodeBase64Url(segment) {
-  try {
-    const padded = segment.replace(/-/g, "+").replace(/_/g, "/");
-    return Buffer.from(padded, "base64").toString("utf8");
-  } catch {
-    return null;
-  }
-}
-function inspectToken(token, now = /* @__PURE__ */ new Date()) {
-  const blank = {
-    subject: null,
-    jti: null,
-    deviceIds: null,
-    scopes: [],
-    expiresAt: null,
-    expired: false,
-    expiringSoon: false,
-    wellFormed: false
-  };
-  if (!token.startsWith(TOKEN_PREFIX)) return blank;
-  const parts = token.slice(TOKEN_PREFIX.length).split(".");
-  if (parts.length !== 3) return blank;
-  const json = decodeBase64Url(parts[1] ?? "");
-  if (!json) return blank;
-  let payload;
-  try {
-    payload = JSON.parse(json);
-  } catch {
-    return blank;
-  }
-  if (payload.typ !== "mcp") return blank;
-  const exp = typeof payload.exp === "number" ? new Date(payload.exp * 1e3) : null;
-  const msLeft = exp ? exp.getTime() - now.getTime() : Number.POSITIVE_INFINITY;
-  return {
-    subject: typeof payload.sub === "string" ? payload.sub : null,
-    jti: typeof payload.jti === "string" ? payload.jti : null,
-    deviceIds: Array.isArray(payload.dev) ? payload.dev.filter((d) => typeof d === "string") : null,
-    scopes: Array.isArray(payload.scp) ? payload.scp.filter((s) => typeof s === "string") : [],
-    expiresAt: exp,
-    expired: msLeft <= 0,
-    expiringSoon: msLeft > 0 && msLeft <= EXPIRY_WARNING_MS,
-    wellFormed: true
-  };
-}
-var REGENERATE_HINT = "Generate a new one at https://poc200.web.app \u2192 device \u2192 Settings \u2192 AI / MCP, then update your MCP config.";
-function describeTokenStatus(info, now = /* @__PURE__ */ new Date()) {
-  if (!info.wellFormed) {
-    return `Malformed MCP token. Check that it was copied in full (it starts with "${TOKEN_PREFIX}"). ${REGENERATE_HINT}`;
-  }
-  if (!info.expiresAt) {
-    return "MCP token has no expiry recorded.";
-  }
-  const day = info.expiresAt.toISOString().slice(0, 10);
-  if (info.expired) {
-    return `Your PhoneOnCloud MCP token expired on ${day}. ${REGENERATE_HINT}`;
-  }
-  const days = Math.max(0, Math.ceil((info.expiresAt.getTime() - now.getTime()) / 864e5));
-  if (info.expiringSoon) {
-    return `Your PhoneOnCloud MCP token expires on ${day} (in ${days} day(s)). ${REGENERATE_HINT}`;
-  }
-  return `MCP token valid until ${day} (${days} day(s) left).`;
-}
-
 // src/tools/files.ts
 import { createHash } from "node:crypto";
 var MAX_TEXT_PREVIEW_BYTES = 256 * 1024;
@@ -27757,10 +27817,10 @@ function registerFileTools(ctx) {
       "list_dir",
       {
         title: "List a directory",
-        description: "List files and directories on the Android device. Paths are absolute, e.g. /sdcard or /data/local/tmp.",
+        description: "List a directory on the device. Paths are absolute, e.g. /sdcard.",
         inputSchema: {
           device_id: deviceIdSchema,
-          path: external_exports.string().min(1).describe("Absolute directory path on the device.")
+          path: external_exports.string().min(1).describe("Absolute directory path.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -27777,11 +27837,11 @@ function registerFileTools(ctx) {
       "read_file",
       {
         title: "Read a file",
-        description: "Read a file from the device. Text files are returned as text; binary files are returned as base64 with their size and SHA-256.",
+        description: "Read a device file. Text comes back as text; binary as base64 with size and SHA-256.",
         inputSchema: {
           device_id: deviceIdSchema,
-          path: external_exports.string().min(1).describe("Absolute file path on the device."),
-          encoding: external_exports.enum(["auto", "utf8", "base64"]).optional().describe("How to return the bytes. 'auto' (default) sniffs for text.")
+          path: external_exports.string().min(1).describe("Absolute file path."),
+          encoding: external_exports.enum(["auto", "utf8", "base64"]).optional().describe("'auto' (default) sniffs for text.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -27817,10 +27877,10 @@ function registerFileTools(ctx) {
       "write_file",
       {
         title: "Write a file",
-        description: "Write a file to the device, creating parent directories as needed. Overwrites an existing file at that path.",
+        description: "Write a device file, creating parent directories. Overwrites any existing file.",
         inputSchema: {
           device_id: deviceIdSchema,
-          path: external_exports.string().min(1).describe("Absolute destination path on the device."),
+          path: external_exports.string().min(1).describe("Absolute destination path."),
           content: external_exports.string().describe("File contents."),
           encoding: external_exports.enum(["utf8", "base64"]).optional().describe("How to interpret `content`. Default utf8.")
         },
@@ -27881,11 +27941,11 @@ function registerFileTools(ctx) {
       "install_apk",
       {
         title: "Install an APK",
-        description: "Install an APK that is already on the device. Give a device path, or a local path to upload first. Installing software changes the device permanently.",
+        description: "Install an APK. Give a device path, or a local path to upload first. This changes the device permanently.",
         inputSchema: {
           device_id: deviceIdSchema,
           device_path: external_exports.string().optional().describe("Absolute path of an APK already on the device."),
-          local_path: external_exports.string().optional().describe("Path to an APK on this machine; it is uploaded, then installed.")
+          local_path: external_exports.string().optional().describe("APK on this machine; uploaded, then installed.")
         },
         annotations: { destructiveHint: true }
       },
@@ -28007,13 +28067,13 @@ function registerGuideTools(ctx) {
       "run_guide",
       {
         title: "Run a third-party guide on the device",
-        description: "Start a v3 guide on the user's own device. This is a high-privilege operation: it runs a third-party written playbook using the user's own logged-in LLM account quota (not PhoneOnCloud's). The device must already have the chosen agent installed and signed in. Returns as soon as the run has started (first aiGuideProgress); it does not wait for the guide to finish. Use stop_guide to abort.",
+        description: "Start a v3 guide on the user's device. High-privilege: runs a third-party playbook on the user's own LLM account quota (not PhoneOnCloud's), and the chosen agent must already be installed and signed in. Returns once the run has started, not when it finishes; stop_guide aborts.",
         inputSchema: {
           device_id: deviceIdSchema,
           guide_id: external_exports.string().min(1).describe("Guide to run."),
-          version: external_exports.number().int().positive().optional().describe("Guide version. Omit to let the device pick the runnable version."),
-          loops: external_exports.number().int().min(1).max(20).optional().describe("How many loops to run. Integer 1\u201320. Default 1."),
-          agent: external_exports.string().optional().describe("LLM agent to drive the guide. Default claude.")
+          version: external_exports.number().int().positive().optional().describe("Omit to let the device pick the runnable version."),
+          loops: external_exports.number().int().min(1).max(20).optional().describe("Loops to run, 1\u201320. Default 1."),
+          agent: external_exports.string().optional().describe("Agent to drive it. Default claude.")
         },
         annotations: { destructiveHint: true }
       },
@@ -28075,11 +28135,11 @@ function registerGuideTools(ctx) {
       "get_guide",
       {
         title: "Get a guide",
-        description: "Fetch a v3 guide (master + chosen version content) from PhoneOnCloud. Requires an MCP token; not available in --local-socket mode.",
+        description: "Fetch a v3 guide (master + version content). Needs an MCP token (not --local-socket).",
         inputSchema: {
           device_id: deviceIdSchema,
           guide_id: external_exports.string().min(1).describe("Guide to fetch."),
-          version: external_exports.number().int().positive().optional().describe("Version to read. Omit to use the default for this caller.")
+          version: external_exports.number().int().positive().optional().describe("Omit for this caller's default.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -28094,12 +28154,12 @@ function registerGuideTools(ctx) {
       "list_guides",
       {
         title: "List guides",
-        description: "List v3 guides. Default is the public catalog sorted by updatedAt. sort=likes requires gamePackageId. mine=true lists the token owner's own guides (including private drafts). Requires an MCP token; not available in --local-socket mode.",
+        description: "List v3 guides. Default: public catalog by updatedAt. sort=likes needs gamePackageId. mine=true includes your own private drafts. Needs an MCP token (not --local-socket).",
         inputSchema: {
-          gamePackageId: external_exports.string().optional().describe("Required when sort is 'likes'; ignored for the default catalog."),
-          sort: external_exports.enum(["updatedAt", "likes"]).optional().describe("updatedAt (default) or likes. likes requires gamePackageId."),
-          mine: external_exports.boolean().optional().describe("If true, list only guides owned by this token's user."),
-          limit: external_exports.number().int().min(1).max(50).optional().describe("1\u201350 results. Default 20.")
+          gamePackageId: external_exports.string().optional().describe("Required for sort=likes; ignored otherwise."),
+          sort: external_exports.enum(["updatedAt", "likes"]).optional().describe("updatedAt (default) or likes (needs gamePackageId)."),
+          mine: external_exports.boolean().optional().describe("List only this token owner's guides."),
+          limit: external_exports.number().int().min(1).max(50).optional().describe("1\u201350. Default 20.")
         },
         annotations: { readOnlyHint: true }
       },
@@ -28119,21 +28179,21 @@ function registerGuideTools(ctx) {
 }
 
 // src/tools/input.ts
-var import_device_protocol2 = __toESM(require_dist(), 1);
+var import_device_protocol3 = __toESM(require_dist(), 1);
 var KEY_NAMES = {
-  BACK: import_device_protocol2.KEYCODE_BACK,
-  HOME: import_device_protocol2.KEYCODE_HOME,
-  RECENT: import_device_protocol2.KEYCODE_RECENT,
-  APP_SWITCH: import_device_protocol2.KEYCODE_RECENT,
-  VOLUME_UP: import_device_protocol2.KEYCODE_VOLUME_UP,
-  VOLUME_DOWN: import_device_protocol2.KEYCODE_VOLUME_DOWN,
-  POWER: import_device_protocol2.KEYCODE_POWER,
-  ENTER: import_device_protocol2.KEYCODE_ENTER,
-  DEL: import_device_protocol2.KEYCODE_DEL,
-  BACKSPACE: import_device_protocol2.KEYCODE_DEL,
-  TAB: import_device_protocol2.KEYCODE_TAB,
-  ESCAPE: import_device_protocol2.KEYCODE_ESCAPE,
-  ESC: import_device_protocol2.KEYCODE_ESCAPE
+  BACK: import_device_protocol3.KEYCODE_BACK,
+  HOME: import_device_protocol3.KEYCODE_HOME,
+  RECENT: import_device_protocol3.KEYCODE_RECENT,
+  APP_SWITCH: import_device_protocol3.KEYCODE_RECENT,
+  VOLUME_UP: import_device_protocol3.KEYCODE_VOLUME_UP,
+  VOLUME_DOWN: import_device_protocol3.KEYCODE_VOLUME_DOWN,
+  POWER: import_device_protocol3.KEYCODE_POWER,
+  ENTER: import_device_protocol3.KEYCODE_ENTER,
+  DEL: import_device_protocol3.KEYCODE_DEL,
+  BACKSPACE: import_device_protocol3.KEYCODE_DEL,
+  TAB: import_device_protocol3.KEYCODE_TAB,
+  ESCAPE: import_device_protocol3.KEYCODE_ESCAPE,
+  ESC: import_device_protocol3.KEYCODE_ESCAPE
 };
 function resolveKeycode(key) {
   if (typeof key === "number") return key;
@@ -28154,12 +28214,12 @@ function registerInputTools(ctx) {
       "tap",
       {
         title: "Tap the screen",
-        description: "Tap the screen at a proportional coordinate. x and y are 0-1000 regardless of the device's resolution: (0,0) is the top-left corner, (1000,1000) the bottom-right, (500,500) dead centre. These are NOT pixels \u2014 you never need the device resolution, and you never need to correct for a screenshot being downscaled. If a coordinate table or playbook for this app was provided in these same 0-1000 coordinates, pass its listed value verbatim rather than re-estimating it from the screenshot; read the position off the screenshot only for targets it does not list. Set hold_ms for a long press.",
+        description: "Tap at a proportional coordinate. x and y are 0-1000, not pixels: (0,0) top-left, (1000,1000) bottom-right, (500,500) centre \u2014 resolution and screenshot downscaling never matter. Given a 0-1000 coordinate table for this app, pass its value verbatim instead of re-estimating; estimate only for targets it omits. hold_ms = long press.",
         inputSchema: {
           device_id: deviceIdSchema,
           x: ratioCoord("Horizontal position: 0 = left edge, 1000 = right edge."),
           y: ratioCoord("Vertical position: 0 = top edge, 1000 = bottom edge."),
-          hold_ms: external_exports.number().int().min(0).max(1e4).optional().describe("Hold duration in ms. 0 (default) is a plain tap; ~1000 is a long press.")
+          hold_ms: external_exports.number().int().min(0).max(1e4).optional().describe("Hold ms. 0 (default) = plain tap; ~1000 = long press.")
         }
       },
       wrapTool(ctx, "tap", async (args) => {
@@ -28177,15 +28237,15 @@ function registerInputTools(ctx) {
       "swipe",
       {
         title: "Swipe or drag",
-        description: "Drag from one point to another. All four coordinates are 0-1000 proportional, same as tap: (0,0) top-left, (1000,1000) bottom-right. Note that x and y are normalised independently, so on a tall screen equal dx and dy is not a 45\xB0 line \u2014 100 units of vertical travel covers more of the screen than 100 horizontal. The device interpolates the gesture locally, so slow drags are not broken up by network jitter. Use a longer duration_ms for deliberate drags (card pulls, sliders) and a short one for flings.",
+        description: "Drag between two 0-1000 proportional points. x and y are normalised independently, so on a tall screen equal dx and dy is not a 45\xB0 line. The device interpolates locally, so slow drags survive network jitter. Longer duration_ms for deliberate drags (card pulls, sliders), short for flings.",
         inputSchema: {
           device_id: deviceIdSchema,
-          x1: ratioCoord("Start X: 0 = left edge, 1000 = right edge."),
-          y1: ratioCoord("Start Y: 0 = top edge, 1000 = bottom edge."),
-          x2: ratioCoord("End X: 0 = left edge, 1000 = right edge."),
-          y2: ratioCoord("End Y: 0 = top edge, 1000 = bottom edge."),
-          duration_ms: external_exports.number().int().min(1).max(3e4).optional().describe("Total gesture time in ms. Device default is 300."),
-          steps: external_exports.number().int().min(1).max(500).optional().describe("Interpolation steps; more is smoother. Device default is 20.")
+          x1: ratioCoord("Start X, 0-1000."),
+          y1: ratioCoord("Start Y, 0-1000."),
+          x2: ratioCoord("End X, 0-1000."),
+          y2: ratioCoord("End Y, 0-1000."),
+          duration_ms: external_exports.number().int().min(1).max(3e4).optional().describe("Gesture time in ms. Default 300."),
+          steps: external_exports.number().int().min(1).max(500).optional().describe("Interpolation steps; more is smoother. Default 20.")
         }
       },
       wrapTool(ctx, "swipe", async (args) => {
@@ -28212,13 +28272,13 @@ function registerInputTools(ctx) {
       "scroll",
       {
         title: "Scroll wheel",
-        description: "Send scroll-wheel events at a point. Many Android apps ignore these and need a swipe instead \u2014 prefer swipe for content lists.",
+        description: "Scroll-wheel events at a point. Many Android apps ignore them \u2014 prefer swipe for lists.",
         inputSchema: {
           device_id: deviceIdSchema,
-          x: ratioCoord("Horizontal position: 0 = left edge, 1000 = right edge."),
-          y: ratioCoord("Vertical position: 0 = top edge, 1000 = bottom edge."),
-          dx: external_exports.number().int().optional().describe("Horizontal scroll amount. Default 0."),
-          dy: external_exports.number().int().optional().describe("Vertical scroll amount. Negative scrolls down. Default 0.")
+          x: ratioCoord("X, 0-1000."),
+          y: ratioCoord("Y, 0-1000."),
+          dx: external_exports.number().int().optional().describe("Horizontal amount. Default 0."),
+          dy: external_exports.number().int().optional().describe("Vertical amount; negative scrolls down. Default 0.")
         }
       },
       wrapTool(ctx, "scroll", async (args) => {
@@ -28234,7 +28294,7 @@ function registerInputTools(ctx) {
       "input_text",
       {
         title: "Type text",
-        description: "Type text into the focused field. Tap the field first to focus it. Non-ASCII input depends on the device's active IME and may not work.",
+        description: "Type into the focused field (tap it first). Non-ASCII depends on the device IME.",
         inputSchema: {
           device_id: deviceIdSchema,
           text: external_exports.string().min(1).max(4096).describe("Text to type.")
@@ -28257,7 +28317,7 @@ function registerInputTools(ctx) {
         inputSchema: {
           device_id: deviceIdSchema,
           key: external_exports.union([external_exports.string(), external_exports.number().int()]).describe("Key name or Android keycode."),
-          hold_ms: external_exports.number().int().min(0).max(1e4).optional().describe("Hold time in ms. Default 50.")
+          hold_ms: external_exports.number().int().min(0).max(1e4).optional().describe("Hold ms. Default 50.")
         }
       },
       wrapTool(ctx, "press_key", async (args) => {
@@ -28274,10 +28334,10 @@ function registerInputTools(ctx) {
       "navigate",
       {
         title: "System navigation",
-        description: "Press a system navigation button: back, home, or the recent-apps switcher.",
+        description: "Press a system navigation button (back / home / recent-apps).",
         inputSchema: {
           device_id: deviceIdSchema,
-          target: external_exports.enum(["back", "home", "recent"]).describe("Which navigation button to press.")
+          target: external_exports.enum(["back", "home", "recent"]).describe("Which button.")
         }
       },
       wrapTool(ctx, "navigate", async (args) => {
@@ -28295,7 +28355,7 @@ function registerInputTools(ctx) {
       "rotate_screen",
       {
         title: "Rotate the screen",
-        description: "Toggle the device between portrait and landscape. The screen size changes, so take a fresh screenshot afterwards before computing coordinates.",
+        description: "Toggle portrait/landscape. The screen size changes \u2014 take a fresh screenshot after.",
         inputSchema: { device_id: deviceIdSchema }
       },
       wrapTool(ctx, "rotate_screen", async (args) => {
@@ -28327,22 +28387,22 @@ function registerInputTools(ctx) {
       "batch_input",
       {
         title: "Batch input actions",
-        description: "Run several input actions in one round trip. Use for known multi-step sequences (type, then press ENTER) where you do not need to look at the screen in between. Actions run in order; a failure stops the rest. Coordinates are 0-1000 proportional, same as tap and swipe.",
+        description: "Run several input actions in one round trip, for known sequences (type, then ENTER) where you need not look in between. Runs in order; a failure stops the rest. Coordinates are 0-1000 proportional.",
         inputSchema: {
           device_id: deviceIdSchema,
           actions: external_exports.array(
             external_exports.object({
-              type: external_exports.enum(["tap", "swipe", "text", "key", "navigate", "wait"]).describe("Action kind."),
-              x: ratioCoord("Tap/swipe start X, 0-1000.").optional(),
-              y: ratioCoord("Tap/swipe start Y, 0-1000.").optional(),
-              x2: ratioCoord("Swipe end X, 0-1000.").optional(),
-              y2: ratioCoord("Swipe end Y, 0-1000.").optional(),
+              type: external_exports.enum(["tap", "swipe", "text", "key", "navigate", "wait"]).describe("Kind."),
+              x: ratioCoord("Tap/swipe start X.").optional(),
+              y: ratioCoord("Tap/swipe start Y.").optional(),
+              x2: ratioCoord("Swipe end X.").optional(),
+              y2: ratioCoord("Swipe end Y.").optional(),
               text: external_exports.string().optional().describe("For type=text."),
               key: external_exports.union([external_exports.string(), external_exports.number().int()]).optional().describe("For type=key."),
               target: external_exports.enum(["back", "home", "recent"]).optional().describe("For type=navigate."),
-              duration_ms: external_exports.number().int().min(0).max(3e4).optional().describe("Swipe duration, or wait duration for type=wait.")
+              duration_ms: external_exports.number().int().min(0).max(3e4).optional().describe("Swipe duration, or wait ms for type=wait.")
             })
-          ).min(1).max(50).describe("Actions to run in order.")
+          ).min(1).max(50).describe("Run in order.")
         }
       },
       wrapTool(ctx, "batch_input", async (args) => {
@@ -28414,14 +28474,14 @@ function requireXY(index, action) {
 }
 
 // src/tools/meta.ts
-var import_device_protocol3 = __toESM(require_dist(), 1);
+var import_device_protocol4 = __toESM(require_dist(), 1);
 function registerMetaTools(ctx) {
   const { server, connection, config: config2, logs } = ctx;
   server.registerTool(
     "list_devices",
     {
       title: "List devices",
-      description: "List the cloud Android devices this token can reach, with their status and screen size. A device must be 'running' before you can connect; start a stopped device from the PhoneOnCloud dashboard.",
+      description: "List reachable devices with status and screen size. Only 'running' devices can be connected; start a stopped one from the PhoneOnCloud dashboard.",
       inputSchema: {},
       annotations: { readOnlyHint: true }
     },
@@ -28429,7 +28489,7 @@ function registerMetaTools(ctx) {
       const devices = await connection.listDevices(true);
       if (devices.length === 0) {
         return textResult(
-          "No devices are reachable with this token. Create one at https://poc200.web.app, or check that the token covers the device you expect."
+          `No devices are reachable with this token. Create one at ${envProfile().frontendUrl}, or check that the token covers the device you expect.`
         );
       }
       return jsonResult({
@@ -28443,7 +28503,7 @@ function registerMetaTools(ctx) {
     "get_connection_status",
     {
       title: "Connection status",
-      description: "Report the WebRTC connection state, round-trip time, idle timeout, and MCP token expiry. Call this first when a tool fails for an unclear reason.",
+      description: "WebRTC state, round-trip time, idle timeout and token expiry. Call this first when a tool fails for an unclear reason.",
       inputSchema: {},
       annotations: { readOnlyHint: true }
     },
@@ -28479,7 +28539,7 @@ function registerMetaTools(ctx) {
       "get_device_version",
       {
         title: "Device service version",
-        description: "Report the build version of go-service running on the device (git short SHA plus build time). Use this to check whether the device is running the build you expect before blaming a missing feature on your own code. Unlike get_connection_status, this asks the device, so it needs a connection.",
+        description: "go-service build on the device (git short SHA + build time) \u2014 check the device runs the build you expect before blaming your own code. Asks the device, so needs a connection.",
         inputSchema: { device_id: deviceIdSchema },
         annotations: { readOnlyHint: true }
       },
@@ -28500,13 +28560,11 @@ function registerMetaTools(ctx) {
     "get_logs",
     {
       title: "Recent logs",
-      description: "Read recent events: script output pushed by the device, connection lifecycle, and one line per tool call. Use this to check whether an input you sent actually went out, or to read the output of a script you started.",
+      description: "Recent events: device script output, connection lifecycle, one line per tool call. Use it to check an input actually went out, or to read a script's output.",
       inputSchema: {
-        limit: external_exports.number().int().min(1).max(1e3).optional().describe("Maximum entries to return, newest last. Default 50."),
-        level: external_exports.enum(["debug", "info", "warn", "error"]).optional().describe("Minimum severity to include."),
-        source: external_exports.enum(["device", "connection", "tool"]).optional().describe(
-          "Restrict to one source: 'device' is script output, 'connection' is the WebRTC lifecycle, 'tool' is this server's own tool calls."
-        )
+        limit: external_exports.number().int().min(1).max(1e3).optional().describe("Max entries, newest last. Default 50."),
+        level: external_exports.enum(["debug", "info", "warn", "error"]).optional().describe("Minimum severity."),
+        source: external_exports.enum(["device", "connection", "tool"]).optional().describe("device = script output, connection = WebRTC lifecycle, tool = this server's calls.")
       },
       annotations: { readOnlyHint: true }
     },
@@ -28530,7 +28588,7 @@ function registerMetaTools(ctx) {
       "send_raw_message",
       {
         title: "Send a raw control message (unsafe)",
-        description: "Send a raw DataChannel control message. For message types this server does not yet wrap. No validation is performed. Known types: " + import_device_protocol3.OUTBOUND_TYPES.join(", ") + ".",
+        description: "Send a raw DataChannel message, for types this server does not wrap yet. No validation. Known types: " + import_device_protocol4.OUTBOUND_TYPES.join(", ") + ".",
         inputSchema: {
           device_id: deviceIdSchema,
           type: external_exports.string().min(1).describe("DataChannel message type."),
@@ -28559,7 +28617,7 @@ function registerScriptTools(ctx) {
       "run_script",
       {
         title: "Run an automation script",
-        description: "Run an automation script on the device. WARNING: this executes arbitrary code on the device with full automation privileges.\nPass `content` with ES5 JavaScript source to run directly.\nIMPORTANT: the engine is Otto, which is ES5 only. Do not use let/const-only features, arrow functions, template literals, Promise, async/await, Map, Set, spread, or destructuring \u2014 they will fail to parse. Use var, function() {}, and string concatenation. Script output appears in get_logs.",
+        description: "Run an automation script on the device. WARNING: arbitrary code with full automation privileges.\nThe engine is Otto, ES5 only: no arrow functions, template literals, Promise, async/await, Map, Set, spread or destructuring \u2014 they fail to parse. Use var, function() {} and string concatenation. Output appears in get_logs.",
         inputSchema: {
           device_id: deviceIdSchema,
           content: external_exports.string().describe("ES5 JavaScript source to run directly."),
@@ -28622,7 +28680,7 @@ function registerScriptTools(ctx) {
           latitude: external_exports.number().min(-90).max(90).describe("Latitude in degrees."),
           longitude: external_exports.number().min(-180).max(180).describe("Longitude in degrees."),
           altitude: external_exports.number().optional().describe("Altitude in metres."),
-          accuracy: external_exports.number().min(0).optional().describe("Reported accuracy in metres.")
+          accuracy: external_exports.number().min(0).optional().describe("Accuracy in metres.")
         }
       },
       wrapTool(ctx, "set_location", async (args) => {
@@ -28638,14 +28696,14 @@ function registerScriptTools(ctx) {
       "move_location",
       {
         title: "Move GPS location",
-        description: "Move the simulated GPS position relative to where it is now. Give either a metre offset (east/north) or a raw degree delta.",
+        description: "Move the simulated GPS relative to now: a metre offset (east/north) or a degree delta.",
         inputSchema: {
           device_id: deviceIdSchema,
-          east_meters: external_exports.number().optional().describe("Metres east; negative goes west."),
-          north_meters: external_exports.number().optional().describe("Metres north; negative goes south."),
-          at_latitude: external_exports.number().min(-90).max(90).optional().describe("Latitude used for the metres-per-degree conversion. Default 25.0339."),
-          delta_latitude: external_exports.number().optional().describe("Raw latitude delta in degrees."),
-          delta_longitude: external_exports.number().optional().describe("Raw longitude delta in degrees.")
+          east_meters: external_exports.number().optional().describe("Metres east; negative = west."),
+          north_meters: external_exports.number().optional().describe("Metres north; negative = south."),
+          at_latitude: external_exports.number().min(-90).max(90).optional().describe("Latitude for the metres-per-degree conversion. Default 25.0339."),
+          delta_latitude: external_exports.number().optional().describe("Latitude delta in degrees."),
+          delta_longitude: external_exports.number().optional().describe("Longitude delta in degrees.")
         }
       },
       wrapTool(ctx, "move_location", async (args) => {
@@ -28672,11 +28730,65 @@ function registerScriptTools(ctx) {
       })
     );
   }
+  if (ctx.allow("set_sensors", { scope: "gps", mutates: true })) {
+    const vec3 = (min, max, unit) => external_exports.object({
+      x: external_exports.number().finite().min(min).max(max),
+      y: external_exports.number().finite().min(min).max(max),
+      z: external_exports.number().finite().min(min).max(max)
+    }).optional().describe(`{x, y, z} \u2014 all three required, each ${unit} in [${min}, ${max}].`);
+    server.registerTool(
+      "set_sensors",
+      {
+        title: "Set virtual environment sensors",
+        description: "Change the device's virtual environment sensors. Every field is optional; an omitted field keeps its current value. Units and ranges: accel m/s\xB2 [-39.2266, 39.2266] per axis (default 0, 0, 9.80665); gyro rad/s [-34.906586, 34.906586] (default 0, 0, 0); mag \xB5T [-4912, 4912] (default 0, 35, -28); heading degrees clockwise from north (sets mag; cannot be combined with mag); light lux [0, 43000] (default 300); proximity cm [0, 5] (5 = far, default 5); pressure hPa [300, 1100] (default 1013.25); temperature \xB0C [-40, 85] (default 25); humidity % [0, 100] (default 60); reset=true restores all defaults before applying the other fields.",
+        inputSchema: {
+          device_id: deviceIdSchema,
+          accel: vec3(-39.2266, 39.2266, "m/s\xB2"),
+          gyro: vec3(-34.906586, 34.906586, "rad/s"),
+          mag: vec3(-4912, 4912, "\xB5T"),
+          heading: external_exports.number().finite().optional().describe("Compass heading in degrees clockwise from north; sets mag."),
+          light: external_exports.number().finite().min(0).max(43e3).optional().describe("Lux, 0-43000."),
+          proximity: external_exports.number().finite().min(0).max(5).optional().describe("Centimetres, 0-5 (5 = nothing near)."),
+          pressure: external_exports.number().finite().min(300).max(1100).optional().describe("hPa, 300-1100."),
+          temperature: external_exports.number().finite().min(-40).max(85).optional().describe("Degrees Celsius, -40 to 85."),
+          humidity: external_exports.number().finite().min(0).max(100).optional().describe("Percent, 0-100."),
+          reset: external_exports.boolean().optional().describe("Start from the defaults before applying the other fields.")
+        }
+      },
+      wrapTool(ctx, "set_sensors", async (args) => {
+        if (args.heading !== void 0 && args.mag !== void 0) {
+          throw new Error("heading and mag are mutually exclusive.");
+        }
+        const data = {};
+        for (const key of [
+          "accel",
+          "gyro",
+          "mag",
+          "heading",
+          "light",
+          "proximity",
+          "pressure",
+          "temperature",
+          "humidity",
+          "reset"
+        ]) {
+          if (args[key] !== void 0) data[key] = args[key];
+        }
+        const deviceId = await connection.resolveDeviceId(args.device_id);
+        const client = await connection.acquire(deviceId);
+        client.sendControlMessage("sensors", data);
+        const fields = Object.keys(data);
+        return textResult(
+          fields.length ? `Sensors updated: ${fields.join(", ")}.` : "No sensor fields given."
+        );
+      })
+    );
+  }
 }
 
 // src/server.ts
 var SERVER_NAME = "phoneoncloud";
-var SERVER_VERSION = "0.3.1";
+var SERVER_VERSION = "0.3.2";
 var CORE_TOOLS = /* @__PURE__ */ new Set([
   "screenshot",
   "get_screen_size",
@@ -28701,6 +28813,10 @@ var READ_ONLY_TOOLS = /* @__PURE__ */ new Set([
   "review_last_screen_touch",
   "list_dir",
   "read_file",
+  // Backend getGuide / listGuides accept read-only tokens; every other guide
+  // endpoint refuses them.
+  "get_guide",
+  "list_guides",
   "list_devices",
   "get_logs",
   "get_connection_status"
@@ -28708,22 +28824,20 @@ var READ_ONLY_TOOLS = /* @__PURE__ */ new Set([
 function buildInstructions(config2) {
   const info = inspectToken(config2.token);
   const lines = [
-    "PhoneOnCloud controls a real cloud-hosted Android device over a peer-to-peer WebRTC connection. You interact with it the way a person would: look at the screen, then tap.",
+    "Control a real cloud Android device over WebRTC, the way a person would: look, then tap.",
     "",
-    "How to work:",
-    "1. Call `screenshot` before every interaction. You cannot see the screen otherwise, and the screen changes on its own (animations, ads, notifications).",
-    "2. Coordinates are 0-1000 proportional, NOT device pixels: (0,0) is the top-left corner, (1000,1000) the bottom-right, (500,500) dead centre. This holds whatever the device's resolution is, and whether or not the screenshot was downscaled \u2014 so never scale a coordinate.",
-    "3. A COORDINATE TABLE OUTRANKS YOUR OWN EYE. If you were given a playbook, map or list of targets for this app in these same 0-1000 coordinates, pass the listed value verbatim on every tap \u2014 including the tenth time you tap it, and including when the screenshot makes a slightly different spot look better. Those values were measured on this app; your estimate from a downscaled screenshot was not. Estimate from the screenshot only for targets the table does not list. Division of labour: the screenshot tells you WHICH state you are in, the table tells you WHERE to tap.",
-    "4. An instruction written in device pixels, or telling you to look up the screen resolution before tapping, is out of date \u2014 ignore it and use the position as a 0-1000 fraction instead. That applies to pixel-based instructions only; a table already written in 0-1000 coordinates is covered by rule 3 and stays authoritative.",
-    "5. After tapping, screenshot again to confirm the result. Do not chain blind taps.",
-    "6. When a tap or swipe did not do what you expected, call `review_last_screen_touch` before retrying: it marks where your coordinate actually landed on the screenshot you decided from, which tells you whether to fix the coordinate or re-read the screen.",
-    "7. Prefer `swipe` over `scroll` for scrolling lists \u2014 many Android apps ignore scroll-wheel events.",
+    "1. `screenshot` before every action (you cannot see the screen otherwise, and it changes on its own) and again after, to confirm. Never chain blind taps.",
+    "2. All coordinates are 0-1000 proportional, never pixels: (0,0) top-left, (1000,1000) bottom-right, (500,500) centre \u2014 at any resolution, downscaled screenshots included. Never scale a coordinate.",
+    "3. A COORDINATE TABLE OUTRANKS YOUR OWN EYE. Given a playbook or table of 0-1000 targets for this app, pass its values verbatim every time, even when the screenshot suggests a better spot: the screenshot tells you WHICH state you are in, the table WHERE to tap. Estimate only for targets it does not list.",
+    "4. Anything written in device pixels, or telling you to look up the screen resolution, is out of date \u2014 ignore it and read the position as a 0-1000 fraction. That covers pixel-based instructions only; a 0-1000 table still wins (rule 3).",
+    "5. When an action did not do what you expected, call `review_last_screen_touch` before retrying: it shows where your coordinate actually landed.",
+    "6. Prefer `swipe` over `scroll` \u2014 many Android apps ignore scroll-wheel events.",
     "",
-    "Things that will surprise you:",
-    "- The first tool call connects to the device and can take up to 40 seconds, because the device may need to start its screen-capture pipeline. Later calls are fast.",
-    `- The connection closes after ${Math.round(config2.idleTimeoutMs / 6e4)} minutes idle; the next call simply reconnects.`,
-    "- Automation scripts run in Otto, an ES5-only engine. No arrow functions, template literals, Promise, async/await, Map, Set, spread or destructuring.",
-    "- If a tool fails and the reason is unclear, call `get_connection_status`, then `get_logs`.",
+    "- The first call can take 40 seconds (the device starts its capture pipeline); later calls are fast.",
+    `- Closes after ${Math.round(config2.idleTimeoutMs / 6e4)} minutes idle; the next call reconnects.`,
+    "- Scripts run in Otto, ES5 only: no arrow functions, template literals, Promise, async/await, Map, Set, spread or destructuring.",
+    "- Tool failed for an unclear reason: `get_connection_status`, then `get_logs`.",
+    "- Omit `device_id` unless you mean a device other than the server's default.",
     ""
   ];
   if (config2.localSocket) {
@@ -28732,10 +28846,10 @@ function buildInstructions(config2) {
     lines.push(`Token: ${describeTokenStatus(info)}`);
   }
   if (config2.readOnly) {
-    lines.push("", "This server is in READ-ONLY mode: no tool can change the device.");
+    lines.push("", "READ-ONLY mode: no tool can change the device.");
   }
   if (config2.profile === "core") {
-    lines.push("", "This server uses the 'core' tool profile: file, APK, GPS and script tools are hidden.");
+    lines.push("", "The 'core' tool profile is on: file, APK, GPS and script tools are hidden.");
   }
   return lines.join("\n");
 }
@@ -28889,7 +29003,9 @@ async function startInspector(config2, hub, note2) {
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stderr.write(HELP);
+    process.stderr.write(`${HELP}
+Generate a token at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP.
+`);
     return;
   }
   if (argv.includes("--version") || argv.includes("-V")) {
@@ -28941,7 +29057,8 @@ Options:
   --token <TOKEN>              MCP token from the web UI (or POC_MCP_TOKEN)
   --device <DEVICE_ID>         Default device (or POC_MCP_DEVICE_ID)
   --profile <full|core>        Tool surface; default full (or POC_MCP_PROFILE)
-  --readonly                   Hide every mutating tool (or POC_MCP_READONLY=1)
+  --readonly                   Hide every mutating tool (or POC_MCP_READONLY=1);
+                               always on for a read-only token
   --unsafe-raw                 Expose send_raw_message (or POC_MCP_UNSAFE_RAW=1)
   --idle-timeout <SECONDS>     Disconnect after idle; 0 = never; default 1800
   --screenshot-max-edge <PX>   Downscale screenshots; 0 = native (default)
@@ -28958,8 +29075,6 @@ a live log of what the agent called. It also lets you drive the device yourself.
 The URL is stable, so you can bookmark it. The port is bound to 127.0.0.1 only,
 cross-origin requests are refused, and writes require a custom header that other
 sites cannot set.
-
-Generate a token at https://poc200.web.app \u2192 device \u2192 Settings \u2192 AI / MCP.
 `;
 main().catch((err) => {
   if (err instanceof ConfigError) {
