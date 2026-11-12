@@ -11,7 +11,7 @@ handshake touches PhoneOnCloud servers.
 
 ## 1. Get a token
 
-1. Open <https://poc200.web.app> and sign in.
+1. Open <https://app.cloudphonego.com> and sign in.
 2. On the device you want to control, open the **⋯** menu → **AI / MCP**.
 3. Fill in a name (e.g. `MacBook — Claude Code`), pick an expiry (30 days by
    default) and the permissions you want to grant.
@@ -32,7 +32,7 @@ Requires **Node.js 18 or newer**.
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
 ```
 
 ### Claude Desktop
@@ -49,7 +49,8 @@ operating system's keychain.
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
+      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"],
+      "env": { "POC_ENV": "prod" }
     }
   }
 }
@@ -74,7 +75,8 @@ Every option is available as a flag or an environment variable. Flags win.
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | off | Exposes `send_raw_message`. |
 | `--idle-timeout <SECONDS>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | Disconnect after this long with no tool call. `0` never disconnects. |
 | `--screenshot-max-edge <PX>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | Downscale screenshots to this longest edge. `0` sends native resolution. |
-| `--api-base <URL>` | `POC_MCP_API_BASE` | production | Override the backend endpoint. |
+| — | `POC_ENV` | `dev` | Which environment to connect to. Tokens from app.cloudphonego.com need `prod`, or the server reports a malformed token. |
+| `--api-base <URL>` | `POC_MCP_API_BASE` | from `POC_ENV` | Override the backend endpoint. |
 | `--inspector` | `POC_MCP_INSPECTOR` | off | Serve the local inspector page — see below. |
 | `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector port. Bound to 127.0.0.1 only. |
 

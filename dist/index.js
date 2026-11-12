@@ -73,6 +73,7 @@ var require_messages = __commonJS({
       "getImage",
       "getScreenSize",
       "getVersion",
+      "getSystemStats",
       "getScreenColor",
       "listDir",
       "readFile",
@@ -87,6 +88,13 @@ var require_messages = __commonJS({
       "cameraClear",
       "cameraLive",
       "cameraGetState",
+      "vinputState",
+      "vinputConnect",
+      "vinputDisconnect",
+      "vinputEvents",
+      "screenRecordStart",
+      "screenRecordStop",
+      "screenRecordGetState",
       "checkApkExists",
       "installApk",
       "aiEnvStatus",
@@ -104,6 +112,7 @@ var require_messages = __commonJS({
       getImage: "getImageResponse",
       getScreenSize: "getScreenSizeResponse",
       getVersion: "getVersionResponse",
+      getSystemStats: "getSystemStatsResponse",
       getScreenColor: "getScreenColorResponse",
       listDir: "listDirResponse",
       readFile: "readFileResponse",
@@ -114,6 +123,12 @@ var require_messages = __commonJS({
       installApk: "installApkResponse",
       cameraSetImage: "cameraSetImageResponse",
       cameraGetState: "cameraState",
+      vinputState: "vinputState",
+      vinputConnect: "vinputState",
+      vinputDisconnect: "vinputState",
+      screenRecordStart: "screenRecordState",
+      screenRecordStop: "screenRecordState",
+      screenRecordGetState: "screenRecordState",
       aiEnvStatus: "aiEnvStatusResponse",
       aiList: "aiListResponse",
       aiStart: "aiStarted",
@@ -263,7 +278,9 @@ var require_batch = __commonJS({
       "aiStart",
       "aiStop",
       "aiRunGuide",
-      "aiGuideStop"
+      "aiGuideStop",
+      "vinputConnect",
+      "vinputDisconnect"
     ]);
   }
 });
@@ -338,6 +355,118 @@ var require_env = __commonJS({
   }
 });
 
+// ../../packages/device-protocol/dist/vinput.js
+var require_vinput = __commonJS({
+  "../../packages/device-protocol/dist/vinput.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.VINPUT_KEY_CODES = exports.VINPUT_MAX_EVENTS_PER_SECOND = exports.VINPUT_MAX_EVENTS_PER_MESSAGE = void 0;
+    exports.VINPUT_MAX_EVENTS_PER_MESSAGE = 64;
+    exports.VINPUT_MAX_EVENTS_PER_SECOND = 1e3;
+    exports.VINPUT_KEY_CODES = [
+      "KeyA",
+      "KeyB",
+      "KeyC",
+      "KeyD",
+      "KeyE",
+      "KeyF",
+      "KeyG",
+      "KeyH",
+      "KeyI",
+      "KeyJ",
+      "KeyK",
+      "KeyL",
+      "KeyM",
+      "KeyN",
+      "KeyO",
+      "KeyP",
+      "KeyQ",
+      "KeyR",
+      "KeyS",
+      "KeyT",
+      "KeyU",
+      "KeyV",
+      "KeyW",
+      "KeyX",
+      "KeyY",
+      "KeyZ",
+      "Digit0",
+      "Digit1",
+      "Digit2",
+      "Digit3",
+      "Digit4",
+      "Digit5",
+      "Digit6",
+      "Digit7",
+      "Digit8",
+      "Digit9",
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9",
+      "F10",
+      "F11",
+      "F12",
+      "Escape",
+      "Tab",
+      "CapsLock",
+      "ShiftLeft",
+      "ShiftRight",
+      "ControlLeft",
+      "ControlRight",
+      "AltLeft",
+      "AltRight",
+      "MetaLeft",
+      "MetaRight",
+      "Space",
+      "Enter",
+      "Backspace",
+      "Delete",
+      "Insert",
+      "Home",
+      "End",
+      "PageUp",
+      "PageDown",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Minus",
+      "Equal",
+      "BracketLeft",
+      "BracketRight",
+      "Backslash",
+      "Semicolon",
+      "Quote",
+      "Backquote",
+      "Comma",
+      "Period",
+      "Slash",
+      "Numpad0",
+      "Numpad1",
+      "Numpad2",
+      "Numpad3",
+      "Numpad4",
+      "Numpad5",
+      "Numpad6",
+      "Numpad7",
+      "Numpad8",
+      "Numpad9",
+      "NumpadAdd",
+      "NumpadSubtract",
+      "NumpadMultiply",
+      "NumpadDivide",
+      "NumpadDecimal",
+      "NumpadEnter"
+    ];
+  }
+});
+
 // ../../packages/device-protocol/dist/index.js
 var require_dist = __commonJS({
   "../../packages/device-protocol/dist/index.js"(exports) {
@@ -366,6 +495,7 @@ var require_dist = __commonJS({
     __exportStar(require_batch(), exports);
     __exportStar(require_chunks(), exports);
     __exportStar(require_env(), exports);
+    __exportStar(require_vinput(), exports);
   }
 });
 
@@ -28788,7 +28918,7 @@ function registerScriptTools(ctx) {
 
 // src/server.ts
 var SERVER_NAME = "phoneoncloud";
-var SERVER_VERSION = "0.3.2";
+var SERVER_VERSION = "0.3.3";
 var CORE_TOOLS = /* @__PURE__ */ new Set([
   "screenshot",
   "get_screen_size",

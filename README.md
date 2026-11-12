@@ -10,7 +10,7 @@ Android 機器。
 
 ## 1. 產生 token
 
-1. 開 <https://poc200.web.app> 登入。
+1. 開 <https://app.cloudphonego.com> 登入。
 2. 在要操控的那台機器上，點 **⋯** 選單 → **AI / MCP**。
 3. 填名稱（例如 `MacBook — Claude Code`）、選有效期限（預設 30 天）與要授予的權限。
 4. 按 **產生 token**。
@@ -29,7 +29,7 @@ Token 開頭是 `poc_mcp_`。把它當密碼看：在到期之前，它對你選
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
 ```
 
 ### Claude Desktop
@@ -45,7 +45,8 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"]
+      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"],
+      "env": { "POC_ENV": "prod" }
     }
   }
 }
@@ -69,7 +70,8 @@ claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… 
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | 關 | 開放 `send_raw_message`。 |
 | `--idle-timeout <秒>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | 這麼久沒有 tool 呼叫就斷線。`0` = 永不主動斷。 |
 | `--screenshot-max-edge <px>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | 截圖長邊縮到這個大小。`0` = 原生解析度。 |
-| `--api-base <URL>` | `POC_MCP_API_BASE` | 正式站 | 覆寫後端位址。 |
+| — | `POC_ENV` | `dev` | 要連的環境。app.cloudphonego.com 產生的 token 一定要設 `prod`，不然會出現 Malformed token。 |
+| `--api-base <URL>` | `POC_MCP_API_BASE` | 依 `POC_ENV` | 覆寫後端位址。 |
 | `--inspector` | `POC_MCP_INSPECTOR` | 關 | 開本機的 inspector 頁面，見下。 |
 | `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector 的埠號，只綁 127.0.0.1。 |
 
