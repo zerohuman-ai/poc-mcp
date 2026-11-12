@@ -9122,9 +9122,9 @@ var require_image_data = __commonJS({
   }
 });
 
-// cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js
+// cwasm-webp:/home/coder/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js
 var require_webp = __commonJS({
-  "cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
+  "cwasm-webp:/home/coder/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
     var fs = __require("fs");
     var path2 = __require("path");
     var ImageData = require_image_data();
@@ -17389,8 +17389,116 @@ var StdioServerTransport = class {
   }
 };
 
+// src/auth.ts
+import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, hostname as hostname2 } from "node:os";
+import { join } from "node:path";
+
 // src/config.ts
 var import_device_protocol = __toESM(require_dist(), 1);
+var MCP_DEFAULT_ENV = "prod";
+var DEFAULT_API_BASE = import_device_protocol.ENV_PROFILES[MCP_DEFAULT_ENV].backendBaseUrl;
+var DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1e3;
+var DEFAULT_LOG_BUFFER_SIZE = 500;
+var DEFAULT_SCREENSHOT_MAX_EDGE = 0;
+var DEFAULT_SCREENSHOT_FORMAT = "webp";
+var DEFAULT_INSPECTOR_PORT = 7333;
+var ConfigError = class extends Error {
+};
+function envName(env = process.env) {
+  const raw = env.POC_ENV;
+  if (raw === void 0 || raw === "") return MCP_DEFAULT_ENV;
+  if (raw === "dev" || raw === "prod") return (0, import_device_protocol.resolveEnv)(raw, "POC_ENV");
+  throw new ConfigError(`Invalid POC_ENV ${JSON.stringify(raw)}: expected "dev" or "prod" (or unset for ${MCP_DEFAULT_ENV})`);
+}
+function envProfile(env = process.env) {
+  return import_device_protocol.ENV_PROFILES[envName(env)];
+}
+function parseFlags(argv) {
+  const out = /* @__PURE__ */ new Map();
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg || !arg.startsWith("--")) continue;
+    const body = arg.slice(2);
+    const eq = body.indexOf("=");
+    if (eq !== -1) {
+      out.set(body.slice(0, eq), body.slice(eq + 1));
+      continue;
+    }
+    const next = argv[i + 1];
+    if (next !== void 0 && !next.startsWith("--")) {
+      out.set(body, next);
+      i++;
+    } else {
+      out.set(body, "true");
+    }
+  }
+  return out;
+}
+function truthy(value) {
+  if (value === void 0) return false;
+  const v = value.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+function imageFormatOr(value, fallback) {
+  const v = value?.trim().toLowerCase();
+  return v === "webp" || v === "png" ? v : fallback;
+}
+function intOr(value, fallback) {
+  if (value === void 0 || value.trim() === "") return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
+function loadConfig(argv = process.argv.slice(2), env = process.env) {
+  const flags = parseFlags(argv);
+  const pocEnvName = envName(env);
+  const pocEnv = import_device_protocol.ENV_PROFILES[pocEnvName];
+  const localSocket = (flags.get("local-socket") ?? env.POC_MCP_LOCAL_SOCKET ?? "").trim() || null;
+  const token = (flags.get("token") ?? env.POC_MCP_TOKEN ?? "").trim();
+  if (token && localSocket) {
+    process.stderr.write(
+      "[phoneoncloud-mcp] --local-socket set; ignoring --token / WebRTC signaling\n"
+    );
+  }
+  const deviceId = (flags.get("device") ?? flags.get("device-id") ?? env.POC_MCP_DEVICE_ID ?? "").trim();
+  const rawProfile = (flags.get("profile") ?? env.POC_MCP_PROFILE ?? "full").trim().toLowerCase();
+  if (rawProfile !== "full" && rawProfile !== "core") {
+    throw new ConfigError(`Unknown profile "${rawProfile}". Use "full" or "core".`);
+  }
+  const idleSeconds = intOr(
+    flags.get("idle-timeout") ?? env.POC_MCP_IDLE_TIMEOUT,
+    DEFAULT_IDLE_TIMEOUT_MS / 1e3
+  );
+  return {
+    token,
+    env: pocEnvName,
+    deviceId: deviceId || null,
+    apiBase: (flags.get("api-base") ?? env.POC_MCP_API_BASE ?? pocEnv.backendBaseUrl).replace(/\/+$/, ""),
+    profile: rawProfile,
+    // A read-only token forces read-only mode: dropping --readonly from the
+    // config must not bring the mutating tools back.
+    readOnly: truthy(flags.get("readonly") ?? env.POC_MCP_READONLY) || !localSocket && token !== "" && inspectToken(token).readonly,
+    unsafeRaw: truthy(flags.get("unsafe-raw") ?? env.POC_MCP_UNSAFE_RAW),
+    idleTimeoutMs: idleSeconds * 1e3,
+    logBufferSize: intOr(env.POC_MCP_LOG_BUFFER, DEFAULT_LOG_BUFFER_SIZE) || DEFAULT_LOG_BUFFER_SIZE,
+    screenshotMaxEdge: intOr(
+      flags.get("screenshot-max-edge") ?? env.POC_MCP_SCREENSHOT_MAX_EDGE,
+      DEFAULT_SCREENSHOT_MAX_EDGE
+    ),
+    screenshotFormat: imageFormatOr(
+      flags.get("screenshot-format") ?? env.POC_MCP_SCREENSHOT_FORMAT,
+      DEFAULT_SCREENSHOT_FORMAT
+    ),
+    inspector: truthy(flags.get("inspector") ?? env.POC_MCP_INSPECTOR),
+    inspectorPort: intOr(
+      flags.get("inspector-port") ?? env.POC_MCP_INSPECTOR_PORT,
+      DEFAULT_INSPECTOR_PORT
+    ) || DEFAULT_INSPECTOR_PORT,
+    localSocket
+  };
+}
 
 // src/token.ts
 var EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1e3;
@@ -17460,111 +17568,339 @@ function describeTokenStatus(info, now = /* @__PURE__ */ new Date()) {
   return `MCP token valid until ${day} (${days} day(s) left).`;
 }
 
-// src/config.ts
-var DEFAULT_API_BASE = import_device_protocol.ENV_PROFILES[import_device_protocol.DEFAULT_ENV].backendBaseUrl;
-var DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1e3;
-var DEFAULT_LOG_BUFFER_SIZE = 500;
-var DEFAULT_SCREENSHOT_MAX_EDGE = 0;
-var DEFAULT_SCREENSHOT_FORMAT = "webp";
-var DEFAULT_INSPECTOR_PORT = 7333;
-var ConfigError = class extends Error {
+// src/auth.ts
+var StaticToken = class {
+  constructor(token) {
+    this.token = token;
+  }
+  token;
+  mode = "token";
+  current() {
+    return this.token;
+  }
+  async get() {
+    return this.token;
+  }
+  rejected() {
+    return false;
+  }
 };
-function envProfile(env = process.env) {
+var LoginRequiredError = class extends Error {
+  constructor(verificationUrl, userCode, browserOpened) {
+    super(
+      `PhoneOnCloud sign-in required. Show the user this link and ask them to sign in and press Allow: ${verificationUrl} (code ${userCode}, valid for 10 minutes). ` + (browserOpened ? "A browser window was also opened on this computer. " : "") + "When they say it is done, call the tool again. Sign-in is remembered on this computer."
+    );
+    this.verificationUrl = verificationUrl;
+    this.userCode = userCode;
+    this.name = "LoginRequiredError";
+  }
+  verificationUrl;
+  userCode;
+};
+var LoginFailedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "LoginFailedError";
+  }
+};
+function defaultCredentialsDir(env = process.env) {
+  if (process.platform === "win32" && env.APPDATA) return join(env.APPDATA, "phoneoncloud");
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "phoneoncloud");
+}
+function openBrowser(url, env = process.env) {
+  if (env.SSH_CONNECTION || env.SSH_TTY) return false;
+  let cmd;
+  let args;
+  if (process.platform === "darwin") {
+    cmd = "open";
+    args = [url];
+  } else if (process.platform === "win32") {
+    cmd = "rundll32";
+    args = ["url.dll,FileProtocolHandler", url];
+  } else {
+    if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return false;
+    cmd = "xdg-open";
+    args = [url];
+  }
   try {
-    return import_device_protocol.ENV_PROFILES[(0, import_device_protocol.resolveEnv)(env.POC_ENV, "POC_ENV")];
-  } catch (err) {
-    throw new ConfigError(err.message);
+    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    child.on("error", () => {
+    });
+    child.unref();
+    return true;
+  } catch {
+    return false;
   }
 }
-function parseFlags(argv) {
-  const out = /* @__PURE__ */ new Map();
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg || !arg.startsWith("--")) continue;
-    const body = arg.slice(2);
-    const eq = body.indexOf("=");
-    if (eq !== -1) {
-      out.set(body.slice(0, eq), body.slice(eq + 1));
-      continue;
+var FIRST_WAIT_MS = 9e4;
+var LATER_WAIT_MS = 2e4;
+var defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var BrowserLogin = class {
+  constructor(opts) {
+    this.opts = opts;
+    this.dir = opts.dir ?? defaultCredentialsDir();
+    this.credPath = join(this.dir, `mcp-${opts.env}.json`);
+    this.pendingPath = join(this.dir, `mcp-${opts.env}.pending.json`);
+    this.fetchImpl = opts.fetchImpl ?? fetch;
+    this.open = opts.openBrowser ?? openBrowser;
+    this.sleep = opts.sleep ?? defaultSleep;
+    this.now = opts.now ?? Date.now;
+    this.note = opts.note ?? (() => {
+    });
+    this.token = this.readSaved();
+  }
+  opts;
+  mode = "login";
+  token = "";
+  pending = null;
+  polling = null;
+  /** A start request in flight, so concurrent tool calls share one link. */
+  starting = null;
+  /** Set when the last login ended without a token; reported once, then cleared. */
+  failure = null;
+  dir;
+  credPath;
+  pendingPath;
+  fetchImpl;
+  open;
+  sleep;
+  now;
+  note;
+  /** Where the token is saved; shown by `logout` and get_connection_status. */
+  get credentialsPath() {
+    return this.credPath;
+  }
+  current() {
+    return this.token;
+  }
+  async get() {
+    if (this.usable(this.token)) return this.token;
+    const saved = this.readSaved();
+    if (this.usable(saved)) return this.token = saved;
+    if (this.failure) {
+      const message = this.failure;
+      this.failure = null;
+      throw new LoginFailedError(message);
     }
-    const next = argv[i + 1];
-    if (next !== void 0 && !next.startsWith("--")) {
-      out.set(body, next);
-      i++;
-    } else {
-      out.set(body, "true");
+    let fresh = false;
+    let opened = false;
+    if (!this.pending || this.pending.expiresAt <= this.now()) {
+      this.pending = this.readPending();
+      if (!this.pending) {
+        this.starting ??= this.startLink().then((link2) => {
+          this.note(`sign-in required: ${link2.verificationUrl}`);
+          return { link: link2, opened: this.open(link2.verificationUrl) };
+        }).finally(() => {
+          this.starting = null;
+        });
+        const started = await this.starting;
+        this.pending = started.link;
+        fresh = true;
+        opened = started.opened;
+      }
+    }
+    const link = this.pending;
+    this.ensurePolling(link);
+    const waitMs = fresh ? opened ? FIRST_WAIT_MS : 0 : LATER_WAIT_MS;
+    if (waitMs > 0 && await this.waitForToken(waitMs)) return this.token;
+    if (this.failure) {
+      const message = this.failure;
+      this.failure = null;
+      throw new LoginFailedError(message);
+    }
+    throw new LoginRequiredError(link.verificationUrl, link.userCode, opened);
+  }
+  rejected(token) {
+    if (token && token === this.token) {
+      this.token = "";
+      if (this.readSaved() === token) rmSync(this.credPath, { force: true });
+      this.note("saved sign-in was refused by the server; signing in again");
+    }
+    return true;
+  }
+  /**
+   * `poc-mcp login`: start (or join) a login and block until it finishes.
+   * Prints through `print` rather than throwing LoginRequiredError.
+   */
+  async loginInteractive(print, timeoutMs = 10 * 6e4) {
+    try {
+      await this.get();
+      return;
+    } catch (err) {
+      if (!(err instanceof LoginRequiredError)) throw err;
+      print(`Open this link to sign in to PhoneOnCloud:
+
+  ${err.verificationUrl}
+
+Code: ${err.userCode}
+`);
+    }
+    if (await this.waitForToken(timeoutMs)) return;
+    throw new LoginFailedError(this.failure ?? "Sign-in did not finish in time. Run the command again.");
+  }
+  /** Forget the saved sign-in. The token itself stays listed (revocable) in the web UI. */
+  logout() {
+    const had = this.readSaved() !== "";
+    rmSync(this.credPath, { force: true });
+    rmSync(this.pendingPath, { force: true });
+    this.token = "";
+    return had;
+  }
+  // ── internals ────────────────────────────────────────────────────────────
+  usable(token) {
+    if (!token) return false;
+    const info = inspectToken(token, new Date(this.now()));
+    return info.wellFormed && !info.expired;
+  }
+  readSaved() {
+    try {
+      const data = JSON.parse(readFileSync(this.credPath, "utf8"));
+      return typeof data.token === "string" ? data.token : "";
+    } catch {
+      return "";
     }
   }
-  return out;
-}
-function truthy(value) {
-  if (value === void 0) return false;
-  const v = value.trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes" || v === "on";
-}
-function imageFormatOr(value, fallback) {
-  const v = value?.trim().toLowerCase();
-  return v === "webp" || v === "png" ? v : fallback;
-}
-function intOr(value, fallback) {
-  if (value === void 0 || value.trim() === "") return fallback;
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return fallback;
-  return Math.floor(n);
-}
-function loadConfig(argv = process.argv.slice(2), env = process.env) {
-  const flags = parseFlags(argv);
-  const pocEnv = envProfile(env);
-  const localSocket = (flags.get("local-socket") ?? env.POC_MCP_LOCAL_SOCKET ?? "").trim() || null;
-  const token = (flags.get("token") ?? env.POC_MCP_TOKEN ?? "").trim();
-  if (!token && !localSocket) {
-    throw new ConfigError(
-      `No MCP token. Pass --token poc_mcp_\u2026 or set POC_MCP_TOKEN.
-Generate one at ${pocEnv.frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP.
-In-container agents can pass --local-socket /data/poc/mcp.sock instead.`
-    );
+  save(token) {
+    this.writeJson(this.credPath, { token, savedAt: new Date(this.now()).toISOString() });
+    rmSync(this.pendingPath, { force: true });
   }
-  if (token && localSocket) {
-    process.stderr.write(
-      "[phoneoncloud-mcp] --local-socket set; ignoring --token / WebRTC signaling\n"
-    );
+  readPending() {
+    try {
+      const p = JSON.parse(readFileSync(this.pendingPath, "utf8"));
+      if (typeof p.userCode !== "string" || typeof p.deviceCode !== "string") return null;
+      if (!(p.expiresAt > this.now() + 6e4)) return null;
+      return p;
+    } catch {
+      return null;
+    }
   }
-  const deviceId = (flags.get("device") ?? flags.get("device-id") ?? env.POC_MCP_DEVICE_ID ?? "").trim();
-  const rawProfile = (flags.get("profile") ?? env.POC_MCP_PROFILE ?? "full").trim().toLowerCase();
-  if (rawProfile !== "full" && rawProfile !== "core") {
-    throw new ConfigError(`Unknown profile "${rawProfile}". Use "full" or "core".`);
+  /** Owner-only file, written atomically so a concurrent reader never sees half of it. */
+  writeJson(path2, value) {
+    mkdirSync(this.dir, { recursive: true, mode: 448 });
+    const tmp = `${path2}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 384 });
+    renameSync(tmp, path2);
   }
-  const idleSeconds = intOr(
-    flags.get("idle-timeout") ?? env.POC_MCP_IDLE_TIMEOUT,
-    DEFAULT_IDLE_TIMEOUT_MS / 1e3
-  );
-  return {
-    token,
-    deviceId: deviceId || null,
-    apiBase: (flags.get("api-base") ?? env.POC_MCP_API_BASE ?? pocEnv.backendBaseUrl).replace(/\/+$/, ""),
-    profile: rawProfile,
-    // A read-only token forces read-only mode: dropping --readonly from the
-    // config must not bring the mutating tools back.
-    readOnly: truthy(flags.get("readonly") ?? env.POC_MCP_READONLY) || !localSocket && inspectToken(token).readonly,
-    unsafeRaw: truthy(flags.get("unsafe-raw") ?? env.POC_MCP_UNSAFE_RAW),
-    idleTimeoutMs: idleSeconds * 1e3,
-    logBufferSize: intOr(env.POC_MCP_LOG_BUFFER, DEFAULT_LOG_BUFFER_SIZE) || DEFAULT_LOG_BUFFER_SIZE,
-    screenshotMaxEdge: intOr(
-      flags.get("screenshot-max-edge") ?? env.POC_MCP_SCREENSHOT_MAX_EDGE,
-      DEFAULT_SCREENSHOT_MAX_EDGE
-    ),
-    screenshotFormat: imageFormatOr(
-      flags.get("screenshot-format") ?? env.POC_MCP_SCREENSHOT_FORMAT,
-      DEFAULT_SCREENSHOT_FORMAT
-    ),
-    inspector: truthy(flags.get("inspector") ?? env.POC_MCP_INSPECTOR),
-    inspectorPort: intOr(
-      flags.get("inspector-port") ?? env.POC_MCP_INSPECTOR_PORT,
-      DEFAULT_INSPECTOR_PORT
-    ) || DEFAULT_INSPECTOR_PORT,
-    localSocket
-  };
-}
+  async post(path2, body) {
+    let res;
+    try {
+      res = await this.fetchImpl(`${this.opts.apiBase}${path2}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+    } catch (err) {
+      throw new LoginFailedError(
+        `Cannot reach the PhoneOnCloud backend to sign in (${err.message}). Check your internet connection.`
+      );
+    }
+    let payload = {};
+    try {
+      payload = await res.json();
+    } catch {
+    }
+    if (!res.ok) {
+      throw new LoginFailedError(payload?.error?.message ?? `Sign-in request failed with HTTP ${res.status}`);
+    }
+    return payload;
+  }
+  async startLink() {
+    const clientName = this.opts.clientName?.() ?? `MCP \xB7 ${hostname2()}`;
+    const out = await this.post("/mcp/mcpLinkStart", { clientName });
+    if (typeof out.userCode !== "string" || typeof out.deviceCode !== "string" || typeof out.verificationUrl !== "string") {
+      throw new LoginFailedError("The PhoneOnCloud backend returned an unexpected sign-in response.");
+    }
+    const link = {
+      userCode: out.userCode,
+      deviceCode: out.deviceCode,
+      verificationUrl: out.verificationUrl,
+      expiresAt: this.now() + Number(out.expiresIn ?? 600) * 1e3,
+      interval: Math.max(1, Number(out.interval ?? 2))
+    };
+    this.writeJson(this.pendingPath, link);
+    return link;
+  }
+  ensurePolling(link) {
+    if (this.polling) return;
+    this.polling = this.pollUntilDone(link).finally(() => {
+      this.polling = null;
+      if (this.pending === link) this.pending = null;
+    });
+  }
+  async pollUntilDone(link) {
+    let networkErrors = 0;
+    while (this.now() < link.expiresAt) {
+      await this.sleep(link.interval * 1e3);
+      const saved = this.readSaved();
+      if (this.usable(saved)) {
+        this.token = saved;
+        return;
+      }
+      let out;
+      try {
+        out = await this.post("/mcp/mcpLinkPoll", { userCode: link.userCode, deviceCode: link.deviceCode });
+        networkErrors = 0;
+      } catch (err) {
+        if (++networkErrors < 5) continue;
+        this.failure = err.message;
+        return;
+      }
+      switch (out.state) {
+        case "pending":
+          continue;
+        case "approved":
+          if (typeof out.token === "string" && out.token) {
+            this.token = out.token;
+            this.save(out.token);
+            this.note("signed in");
+            return;
+          }
+          this.failure = "The PhoneOnCloud backend approved the sign-in but sent no token. Try again.";
+          return;
+        case "consumed": {
+          for (let i = 0; i < 5; i++) {
+            const t = this.readSaved();
+            if (this.usable(t)) {
+              this.token = t;
+              return;
+            }
+            await this.sleep(200);
+          }
+          this.failure = "Sign-in finished in another window but its token was not saved here. Try again.";
+          rmSync(this.pendingPath, { force: true });
+          return;
+        }
+        case "denied":
+          this.failure = "The sign-in request was declined in the browser. Call the tool again to start over.";
+          rmSync(this.pendingPath, { force: true });
+          return;
+        default:
+          this.failure = "The sign-in link expired. Call the tool again for a new one.";
+          rmSync(this.pendingPath, { force: true });
+          return;
+      }
+    }
+    this.failure = "The sign-in link expired. Call the tool again for a new one.";
+    rmSync(this.pendingPath, { force: true });
+  }
+  /** Resolves true as soon as a usable token arrives, false after `ms` or when the login ends without one. */
+  async waitForToken(ms) {
+    const deadline = this.now() + ms;
+    while (this.now() < deadline) {
+      if (this.usable(this.token)) return true;
+      if (!this.polling) {
+        const saved = this.readSaved();
+        if (this.usable(saved)) {
+          this.token = saved;
+          return true;
+        }
+        return false;
+      }
+      await Promise.race([this.polling, this.sleep(250)]);
+    }
+    return this.usable(this.token);
+  }
+};
 
 // src/inspector/page.ts
 var INSPECTOR_PAGE = String.raw`<!doctype html>
@@ -22252,21 +22588,22 @@ function failMessage(payload, status) {
   return `Request failed with HTTP ${status}`;
 }
 var GuideClient = class {
-  token;
+  auth;
   apiBase;
   fetchImpl;
   constructor(opts) {
-    this.token = opts.token;
+    this.auth = opts.auth ?? new StaticToken(opts.token ?? "");
     this.apiBase = opts.apiBase;
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
-  async call(path2, body) {
+  async call(path2, body, retried = false) {
+    const token = await this.auth.get();
     let res;
     try {
       res = await this.fetchImpl(`${this.apiBase}${path2}`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(body ?? {})
@@ -22287,6 +22624,7 @@ var GuideClient = class {
     } catch {
     }
     if (!res.ok) {
+      if (res.status === 401 && !retried && this.auth.rejected(token)) return this.call(path2, body, true);
       throw new GuideApiError(failCode(payload), failMessage(payload, res.status), res.status);
     }
     if (!payload) {
@@ -22340,25 +22678,26 @@ var SupersededError = class extends Error {
   }
   seenClientTimestamp;
 };
-var defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var defaultSleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 var SignalingClient = class {
-  token;
+  auth;
   apiBase;
   fetchImpl;
   sleep;
   constructor(opts) {
-    this.token = opts.token;
+    this.auth = opts.auth ?? new StaticToken(opts.token ?? "");
     this.apiBase = opts.apiBase;
     this.fetchImpl = opts.fetchImpl ?? fetch;
-    this.sleep = opts.sleep ?? defaultSleep;
+    this.sleep = opts.sleep ?? defaultSleep2;
   }
-  async call(path2, init) {
+  async call(path2, init, retried = false) {
+    const token = await this.auth.get();
     let res;
     try {
       res = await this.fetchImpl(`${this.apiBase}${path2}`, {
         method: init.method,
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          Authorization: `Bearer ${token}`,
           ...init.body === void 0 ? {} : { "Content-Type": "application/json" }
         },
         ...init.body === void 0 ? {} : { body: JSON.stringify(init.body) }
@@ -22378,6 +22717,8 @@ var SignalingClient = class {
     if (!res.ok) {
       const code = payload?.error?.code ?? "internal";
       const message = payload?.error?.message ?? `Request failed with HTTP ${res.status}`;
+      const refused = code === "token_expired" || code === "token_revoked" || code === "token_invalid";
+      if (refused && !retried && this.auth.rejected(token)) return this.call(path2, init, true);
       throw new McpApiError(code, res.status, message);
     }
     return payload;
@@ -22433,7 +22774,7 @@ var SignalingClient = class {
 var SUPERSEDED_MAX_ATTEMPTS = 3;
 var SUPERSEDED_BASE_BACKOFF_MS = 200;
 async function exchangeWithRetry(client, deviceId, offer, opts = {}) {
-  const sleep = opts.sleep ?? defaultSleep;
+  const sleep = opts.sleep ?? defaultSleep2;
   const random = opts.random ?? Math.random;
   let lastError;
   for (let attempt = 1; attempt <= SUPERSEDED_MAX_ATTEMPTS; attempt++) {
@@ -26951,6 +27292,9 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
+// src/server.ts
+import { hostname as hostname3 } from "node:os";
+
 // src/connection.ts
 var import_device_client_node = __toESM(require_dist3(), 1);
 var PING_INTERVAL_MS = 1e4;
@@ -28128,10 +28472,7 @@ function requireGuideHttp(ctx, tool) {
     if (ctx.config.token) throw new Error(bothFlagsError(tool));
     throw new Error(tool === "get_guide" ? LOCAL_SOCKET_GUIDE_HTTP_ERROR : LIST_LOCAL_SOCKET_ERROR);
   }
-  if (!ctx.config.token) {
-    throw new Error(tool === "get_guide" ? LOCAL_SOCKET_GUIDE_HTTP_ERROR : LIST_LOCAL_SOCKET_ERROR);
-  }
-  return new GuideClient({ token: ctx.config.token, apiBase: ctx.config.apiBase });
+  return new GuideClient({ auth: ctx.auth, apiBase: ctx.config.apiBase });
 }
 var RUN_GUIDE_REPLY_TIMEOUT_MS = 15e3;
 var STOP_GUIDE_ERROR_GRACE_MS = 1500;
@@ -28606,7 +28947,7 @@ function requireXY(index, action) {
 // src/tools/meta.ts
 var import_device_protocol4 = __toESM(require_dist(), 1);
 function registerMetaTools(ctx) {
-  const { server, connection, config: config2, logs } = ctx;
+  const { server, connection, config: config2, logs, auth } = ctx;
   server.registerTool(
     "list_devices",
     {
@@ -28647,13 +28988,15 @@ function registerMetaTools(ctx) {
           note: "While connected, the device runs scrcpy (its hardware encoder stays busy). The connection closes automatically after the idle timeout."
         });
       }
-      const info = inspectToken(config2.token);
+      const info = inspectToken(auth.current());
+      const signedOut = auth.mode === "login" && (!info.wellFormed || info.expired);
       return jsonResult({
         ...connection.status(),
         profile: config2.profile,
         readOnly: config2.readOnly,
         token: {
-          status: describeTokenStatus(info),
+          source: auth.mode === "login" ? "browser sign-in" : "--token",
+          status: signedOut ? "Not signed in yet. The next tool call that reaches the device returns a sign-in link." : describeTokenStatus(info),
           expiresAt: info.expiresAt?.toISOString() ?? null,
           expired: info.expired,
           scopes: info.scopes,
@@ -28918,7 +29261,7 @@ function registerScriptTools(ctx) {
 
 // src/server.ts
 var SERVER_NAME = "phoneoncloud";
-var SERVER_VERSION = "0.3.4";
+var SERVER_VERSION = "0.4.0";
 var CORE_TOOLS = /* @__PURE__ */ new Set([
   "screenshot",
   "get_screen_size",
@@ -28951,8 +29294,8 @@ var READ_ONLY_TOOLS = /* @__PURE__ */ new Set([
   "get_logs",
   "get_connection_status"
 ]);
-function buildInstructions(config2) {
-  const info = inspectToken(config2.token);
+function buildInstructions(config2, auth = new StaticToken(config2.token)) {
+  const info = inspectToken(auth.current());
   const lines = [
     "Control a real cloud Android device over WebRTC, the way a person would: look, then tap.",
     "",
@@ -28972,6 +29315,10 @@ function buildInstructions(config2) {
   ];
   if (config2.localSocket) {
     lines.push("Transport: in-container Unix socket (no MCP token).");
+  } else if (auth.mode === "login" && (!info.wellFormed || info.expired)) {
+    lines.push(
+      "Not signed in yet. The first tool call returns a PhoneOnCloud sign-in link: show it to the user, wait until they say they approved it, then call the tool again."
+    );
   } else {
     lines.push(`Token: ${describeTokenStatus(info)}`);
   }
@@ -28983,9 +29330,20 @@ function buildInstructions(config2) {
   }
   return lines.join("\n");
 }
-function buildServer(config2) {
+function createAuth(config2, opts = {}) {
+  if (config2.token || config2.localSocket) return new StaticToken(config2.token);
+  return new BrowserLogin({
+    env: config2.env,
+    apiBase: config2.apiBase,
+    clientName: opts.clientName,
+    note: opts.note
+  });
+}
+function buildServer(config2, opts = {}) {
   const logs = new LogBuffer(config2.logBufferSize);
-  const signaling = new SignalingClient({ token: config2.token, apiBase: config2.apiBase });
+  const clientName = () => `${server.server.getClientVersion()?.name ?? "MCP"} \xB7 ${hostname3()}`;
+  const auth = opts.auth ?? createAuth(config2, { clientName, note: opts.note });
+  const signaling = new SignalingClient({ auth, apiBase: config2.apiBase });
   const connection = new ConnectionManager({
     signaling,
     logs,
@@ -28995,14 +29353,14 @@ function buildServer(config2) {
   });
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { instructions: buildInstructions(config2) }
+    { instructions: buildInstructions(config2, auth) }
   );
-  const allow = (name, opts) => {
+  const allow = (name, opts2) => {
     if (config2.readOnly && !READ_ONLY_TOOLS.has(name)) return false;
     if (config2.profile === "core" && !CORE_TOOLS.has(name)) return false;
-    if (opts.scope) {
-      const info = inspectToken(config2.token);
-      if (info.wellFormed && info.scopes.length > 0 && !info.scopes.includes(opts.scope)) {
+    if (opts2.scope) {
+      const info = inspectToken(auth.current());
+      if (info.wellFormed && info.scopes.length > 0 && !info.scopes.includes(opts2.scope)) {
         return false;
       }
     }
@@ -29014,14 +29372,14 @@ function buildServer(config2) {
     screenshotMaxEdge: config2.screenshotMaxEdge,
     screenshotFormat: config2.screenshotFormat
   });
-  const ctx = { server, config: config2, connection, signaling, logs, allow, inspector };
+  const ctx = { server, config: config2, auth, connection, signaling, logs, allow, inspector };
   registerMetaTools(ctx);
   registerScreenTools(ctx);
   registerInputTools(ctx);
   registerFileTools(ctx);
   registerScriptTools(ctx);
   registerGuideTools(ctx);
-  return { server, connection, logs, inspector };
+  return { server, connection, logs, inspector, auth };
 }
 
 // src/stdioLifecycle.ts
@@ -29133,9 +29491,12 @@ async function startInspector(config2, hub, note2) {
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes("--help") || argv.includes("-h")) {
-    process.stderr.write(`${HELP}
-Generate a token at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP.
-`);
+    process.stderr.write(
+      `${HELP}
+Tokens for --token: ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP.
+POC_ENV=dev targets the test site; unset means prod.
+`
+    );
     return;
   }
   if (argv.includes("--version") || argv.includes("-V")) {
@@ -29143,18 +29504,41 @@ Generate a token at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u
 `);
     return;
   }
+  const command = argv[0] && !argv[0].startsWith("-") ? argv[0] : null;
+  if (command === "login" || command === "logout") {
+    const config3 = loadConfig(argv.slice(1));
+    const auth2 = createAuth({ ...config3, token: "", localSocket: null }, { note });
+    if (!(auth2 instanceof BrowserLogin)) return;
+    if (command === "logout") {
+      const had = auth2.logout();
+      process.stderr.write(
+        had ? `Signed out (removed ${auth2.credentialsPath}). The token stays listed at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u2192 AI / MCP until you revoke it there.
+` : "Not signed in.\n"
+      );
+      return;
+    }
+    await auth2.loginInteractive((line2) => process.stderr.write(`${line2}
+`));
+    process.stderr.write(`Signed in. Saved to ${auth2.credentialsPath}
+`);
+    return;
+  }
+  if (command) {
+    throw new ConfigError(`Unknown command "${command}". Use "login", "logout", or no command to run the server.`);
+  }
   const config2 = loadConfig(argv);
-  if (!config2.localSocket) {
+  if (!config2.localSocket && config2.token) {
     const tokenInfo = inspectToken(config2.token);
     if (!tokenInfo.wellFormed || tokenInfo.expired || tokenInfo.expiringSoon) {
       note(describeTokenStatus(tokenInfo));
     }
   }
-  const { server, connection, logs, inspector } = buildServer(config2);
+  const { server, connection, logs, inspector, auth } = buildServer(config2, { note });
   logs.push("connection", "info", `MCP server ${SERVER_VERSION} started`, {
     profile: config2.profile,
     readOnly: config2.readOnly,
-    defaultDeviceId: config2.deviceId
+    defaultDeviceId: config2.deviceId,
+    auth: auth.mode
   });
   const inspectorServer = config2.inspector ? await startInspector(config2, inspector, note) : null;
   installStdioLifecycle({
@@ -29181,10 +29565,16 @@ Generate a token at ${envProfile().frontendUrl} \u2192 device \u2192 Settings \u
 var HELP = `phoneoncloud-mcp ${SERVER_VERSION} \u2014 MCP server for PhoneOnCloud Android devices
 
 Usage:
-  npx -y @zerohuman-ai/poc-mcp --token <TOKEN> [--device <DEVICE_ID>]
+  npx -y @zerohuman-ai/poc-mcp@latest [options]        run the server (signs in via browser)
+  npx -y @zerohuman-ai/poc-mcp@latest login            sign in now, from a terminal
+  npx -y @zerohuman-ai/poc-mcp@latest logout           forget the saved sign-in
+
+Without --token, the first tool call returns a sign-in link (and opens the
+browser when it can). The sign-in is saved per user and per environment.
 
 Options:
-  --token <TOKEN>              MCP token from the web UI (or POC_MCP_TOKEN)
+  --token <TOKEN>              MCP token from the web UI instead of signing in
+                               (or POC_MCP_TOKEN)
   --device <DEVICE_ID>         Default device (or POC_MCP_DEVICE_ID)
   --profile <full|core>        Tool surface; default full (or POC_MCP_PROFILE)
   --readonly                   Hide every mutating tool (or POC_MCP_READONLY=1);

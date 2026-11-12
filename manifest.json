@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "phoneoncloud",
   "display_name": "PhoneOnCloud",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Screenshot and control a cloud-hosted Android device.",
   "long_description": "Connects Claude Desktop to a PhoneOnCloud Android device over a peer-to-peer WebRTC data channel. Take screenshots, tap, swipe, type, read and write files, install APKs, simulate GPS, and run automation scripts. Screenshots and control traffic go directly between your machine and the device — they do not pass through PhoneOnCloud servers.",
   "author": {
@@ -32,9 +32,9 @@
     "token": {
       "type": "string",
       "title": "MCP Token",
-      "description": "Generate one at app.cloudphonego.com → your device → Settings → AI / MCP. It is shown only once.",
+      "description": "Optional. Leave empty to sign in through your browser on first use. For a token: app.cloudphonego.com → your device → AI / MCP → Advanced.",
       "sensitive": true,
-      "required": true
+      "required": false
     },
     "device_id": {
       "type": "string",
@@ -59,7 +59,7 @@
     "environment": {
       "type": "string",
       "title": "Environment",
-      "description": "\"prod\" for tokens from app.cloudphonego.com. \"dev\" only for the test site.",
+      "description": "\"prod\" (default) for app.cloudphonego.com. \"dev\" only for the test site.",
       "default": "prod",
       "required": false
     }

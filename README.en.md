@@ -9,38 +9,15 @@ handshake touches PhoneOnCloud servers.
 
 ---
 
-## 1. Get a token
-
-1. Open <https://app.cloudphonego.com> and sign in.
-2. On the device you want to control, open the **⋯** menu → **AI / MCP**.
-3. Fill in a name (e.g. `MacBook — Claude Code`), pick an expiry (30 days by
-   default) and the permissions you want to grant.
-4. Click **Create token**.
-
-**The token is shown only once.** Copy it immediately. If you lose it, create a
-new one — it cannot be recovered.
-
-Tokens start with `poc_mcp_`. Treat one like a password: it grants whatever
-permissions you checked, on the devices you selected, until it expires.
-
----
-
-## 2. Install
+## 1. Install (recommended: browser sign-in, no token to copy)
 
 Requires **Node.js 18 or newer**.
 
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp@latest
 ```
-
-### Claude Desktop
-
-Download `poc-mcp.mcpb` from the **AI / MCP** panel — or from the
-[latest release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) — and
-double-click it. Claude Desktop asks for your token and stores it in your
-operating system's keychain.
 
 ### Codex, Cursor, and other JSON-configured clients
 
@@ -49,16 +26,78 @@ operating system's keychain.
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"],
-      "env": { "POC_ENV": "prod" }
+      "args": ["-y", "@zerohuman-ai/poc-mcp@latest"]
     }
   }
 }
 ```
 
-You can also pass the token as an environment variable (`POC_MCP_TOKEN`) instead
-of on the command line, which keeps it out of your shell history and out of any
-config file you might commit.
+Codex reads `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.phoneoncloud]
+command = "npx"
+args = ["-y", "@zerohuman-ai/poc-mcp@latest"]
+```
+
+### Claude Desktop
+
+Download `poc-mcp.mcpb` from the **AI / MCP** panel — or from the
+[latest release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) — and
+double-click it. Leave the token field empty to use browser sign-in.
+
+### First use: sign in
+
+1. Ask the AI to do anything with the device (e.g. "take a screenshot").
+2. It replies with a sign-in link such as
+   `https://app.cloudphonego.com/mcp-link?code=BCDF-GHJK`, and opens your
+   browser when the computer has one.
+3. Sign in with your CloudPhone Go account, check the computer name and code
+   under "Requested by", and press **Allow**.
+4. Go back to the AI tool and ask it to try again.
+
+This computer then stays signed in (saved under `~/.config/phoneoncloud/`, or
+`%APPDATA%\phoneoncloud\` on Windows) for 90 days, and asks you to sign in again
+when that runs out. The token the sign-in created is listed in the **AI / MCP**
+panel, where you can revoke it at any time.
+
+To sign in from a terminal instead: `npx -y @zerohuman-ai/poc-mcp@latest login`.
+To sign this computer out: `npx -y @zerohuman-ai/poc-mcp@latest logout`.
+
+### Updates
+
+`@latest` makes npx check npm for a new version every time the server starts, so
+restarting your AI tool (or reconnecting the MCP server) picks up new releases.
+Without it, npx keeps reusing the copy it cached first. The Claude Desktop
+`.mcpb` does not update itself; download it again.
+
+---
+
+## 2. Advanced: connect with a token
+
+Use a token for CI, servers without a browser, or to limit the AI to certain
+devices or to read-only.
+
+1. Open <https://app.cloudphonego.com> and sign in.
+2. On the device you want to control, open the **⋯** menu → **AI / MCP** →
+   **Advanced: connect with a token**.
+3. Fill in a name (e.g. `MacBook — Claude Code`), pick an expiry (30 days by
+   default) and the permissions you want to grant.
+4. Click **Create token**.
+
+**The token is shown only once.** Copy it immediately. If you lose it, create a
+new one — it cannot be recovered. Tokens start with `poc_mcp_`. Treat one like a
+password: it grants whatever permissions you checked, on the devices you
+selected, until it expires.
+
+```bash
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp@latest --token poc_mcp_… --device <DEVICE_ID>
+```
+
+In JSON configs, append `"--token", "poc_mcp_…"` to `args`. You can also pass
+the token as an environment variable (`POC_MCP_TOKEN`), which keeps it out of
+your shell history and out of any config file you might commit. With a token,
+the server never asks you to sign in.
 
 ---
 
@@ -68,14 +107,14 @@ Every option is available as a flag or an environment variable. Flags win.
 
 | Flag | Environment variable | Default | Meaning |
 | :--- | :--- | :--- | :--- |
-| `--token <TOKEN>` | `POC_MCP_TOKEN` | — | Required. |
-| `--device <ID>` | `POC_MCP_DEVICE_ID` | — | Default device. Optional if the token covers exactly one device. |
+| `--token <TOKEN>` | `POC_MCP_TOKEN` | — | Omit to sign in through the browser. |
+| `--device <ID>` | `POC_MCP_DEVICE_ID` | — | Default device. Optional if you have exactly one. |
 | `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` keeps only the 12 screenshot/input tools. |
 | `--readonly` | `POC_MCP_READONLY` | off | Hides every tool that can change the device. |
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | off | Exposes `send_raw_message`. |
 | `--idle-timeout <SECONDS>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | Disconnect after this long with no tool call. `0` never disconnects. |
 | `--screenshot-max-edge <PX>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | Downscale screenshots to this longest edge. `0` sends native resolution. |
-| — | `POC_ENV` | `dev` | Which environment to connect to. Tokens from app.cloudphonego.com need `prod`, or the server reports a malformed token. |
+| — | `POC_ENV` | `prod` | Which environment to connect to. Set `dev` only for the test site. |
 | `--api-base <URL>` | `POC_MCP_API_BASE` | from `POC_ENV` | Override the backend endpoint. |
 | `--inspector` | `POC_MCP_INSPECTOR` | off | Serve the local inspector page — see below. |
 | `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector port. Bound to 127.0.0.1 only. |
@@ -190,7 +229,9 @@ Start with `get_connection_status`, then `get_logs`.
 
 | Message | Meaning and fix |
 | :--- | :--- |
-| `[token_expired] Your PhoneOnCloud MCP token expired on …` | Create a new token in the AI / MCP panel and update your MCP config. |
+| `PhoneOnCloud sign-in required. … <link>` | Open the link, sign in, press Allow, then ask the AI to try again. |
+| `The sign-in request was declined` / `sign-in link expired` | Call again for a new link. |
+| `[token_expired] Your PhoneOnCloud MCP token expired on …` | With `--token`: create a new token in the AI / MCP panel and update your MCP config. Browser sign-in renews itself. |
 | `[token_revoked] This token was revoked.` | Someone revoked it. Create a new one. |
 | `[token_invalid] Malformed token.` | The token was truncated when copied. It must start with `poc_mcp_` and contain two dots. |
 | `[device_not_running] Device … is stop.` | Start the device from the dashboard first. |
@@ -214,7 +255,10 @@ surface it in their logs. Nothing but JSON-RPC goes to stdout.
   apps** and **Read and write files** if the agent does not need them — those
   three amount to full control of the device.
 - Use `--readonly` when you only want the agent to look.
-- Tokens are stored wherever your MCP client keeps its config. Claude Desktop
+- A browser sign-in is saved in `~/.config/phoneoncloud/mcp-prod.json`, readable
+  only by you. On the sign-in page, press Allow only when you just started the AI
+  tool yourself and the code matches.
+- With `--token`, the token is stored wherever your MCP client keeps its config. Claude Desktop
   uses the OS keychain; other clients may write plain text to a file inside a
   project. Prefer `POC_MCP_TOKEN` in your environment over a value committed to
   a repository.

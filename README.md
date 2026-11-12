@@ -8,35 +8,15 @@ Android 機器。
 
 ---
 
-## 1. 產生 token
-
-1. 開 <https://app.cloudphonego.com> 登入。
-2. 在要操控的那台機器上，點 **⋯** 選單 → **AI / MCP**。
-3. 填名稱（例如 `MacBook — Claude Code`）、選有效期限（預設 30 天）與要授予的權限。
-4. 按 **產生 token**。
-
-**這串只會顯示一次**，請立刻複製保存。遺失只能重新產生，救不回來。
-
-Token 開頭是 `poc_mcp_`。把它當密碼看：在到期之前，它對你選的機器擁有你勾選的
-全部權限。
-
----
-
-## 2. 安裝
+## 1. 安裝（推薦：瀏覽器登入，不用複製 token）
 
 需要 **Node.js 18 或更新的版本**。
 
 ### Claude Code
 
 ```bash
-claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --token poc_mcp_… --device <DEVICE_ID>
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp@latest
 ```
-
-### Claude Desktop
-
-在 **AI / MCP** 面板下載 `poc-mcp.mcpb`（也可以到
-[最新 release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) 抓），雙擊
-安裝。Claude Desktop 會跳出來問你的 token，並存進作業系統的 keychain。
 
 ### Codex、Cursor 與其他吃 JSON 設定的工具
 
@@ -45,15 +25,69 @@ claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --to
   "mcpServers": {
     "phoneoncloud": {
       "command": "npx",
-      "args": ["-y", "@zerohuman-ai/poc-mcp", "--token", "poc_mcp_…", "--device", "<DEVICE_ID>"],
-      "env": { "POC_ENV": "prod" }
+      "args": ["-y", "@zerohuman-ai/poc-mcp@latest"]
     }
   }
 }
 ```
 
-也可以用環境變數 `POC_MCP_TOKEN` 代替命令列參數——這樣 token 不會留在 shell
-歷史，也不會被寫進可能被 commit 的設定檔。
+Codex 寫在 `~/.codex/config.toml`：
+
+```toml
+[mcp_servers.phoneoncloud]
+command = "npx"
+args = ["-y", "@zerohuman-ai/poc-mcp@latest"]
+```
+
+### Claude Desktop
+
+在 **AI / MCP** 面板下載 `poc-mcp.mcpb`（也可以到
+[最新 release](https://github.com/zerohuman-ai/poc-mcp/releases/latest) 抓），雙擊
+安裝。Token 欄位留空，就會走瀏覽器登入。
+
+### 第一次使用：登入
+
+1. 叫 AI 做任何操控機器的事（例如「截一張圖」）。
+2. AI 會回一個登入連結，像 `https://app.cloudphonego.com/mcp-link?code=BCDF-GHJK`。
+   電腦能開瀏覽器時會自動打開。
+3. 用你的 CloudPhone Go 帳號登入，確認「要求來自」的電腦名稱和代碼沒錯，按 **允許**。
+4. 回到 AI 工具叫它再試一次。
+
+之後這台電腦會記住登入（存在 `~/.config/phoneoncloud/`，Windows 是
+`%APPDATA%\phoneoncloud\`），有效 90 天，過期會自動再請你登入一次。登入產生的
+token 會出現在 **AI / MCP** 面板的清單裡，可以隨時撤銷。
+
+也可以先在終端機登入：`npx -y @zerohuman-ai/poc-mcp@latest login`；
+登出（刪掉這台電腦存的登入）：`npx -y @zerohuman-ai/poc-mcp@latest logout`。
+
+### 自動更新
+
+指令裡的 `@latest` 讓 npx 每次啟動 server 時都會檢查 npm 有沒有新版。AI 工具重開
+（或重新連 MCP）就會用到新版。沒有寫 `@latest` 的話，npx 會一直用第一次抓到並快取
+的版本。Claude Desktop 的 `.mcpb` 不會自動更新，要重新下載安裝。
+
+---
+
+## 2. 進階：用 token 連線
+
+CI、沒有瀏覽器的伺服器，或只想讓 AI 碰特定機器、只能唯讀時，改用 token。
+
+1. 開 <https://app.cloudphonego.com> 登入。
+2. 在要操控的那台機器上，點 **⋯** 選單 → **AI / MCP** → **進階：用 token 連線**。
+3. 填名稱（例如 `MacBook — Claude Code`）、選有效期限（預設 30 天）與要授予的權限。
+4. 按 **建立 token**。
+
+**這串只會顯示一次**，請立刻複製保存。遺失只能重新產生，救不回來。
+Token 開頭是 `poc_mcp_`。把它當密碼看：在到期之前，它對你選的機器擁有你勾選的
+全部權限。
+
+```bash
+claude mcp add phoneoncloud -- npx -y @zerohuman-ai/poc-mcp@latest --token poc_mcp_… --device <DEVICE_ID>
+```
+
+JSON 設定就是在 `args` 後面加 `"--token", "poc_mcp_…"`。也可以用環境變數
+`POC_MCP_TOKEN` 代替命令列參數——這樣 token 不會留在 shell 歷史，也不會被寫進
+可能被 commit 的設定檔。有給 token 就不會走瀏覽器登入。
 
 ---
 
@@ -63,14 +97,14 @@ claude mcp add phoneoncloud -e POC_ENV=prod -- npx -y @zerohuman-ai/poc-mcp --to
 
 | Flag | 環境變數 | 預設 | 說明 |
 | :--- | :--- | :--- | :--- |
-| `--token <TOKEN>` | `POC_MCP_TOKEN` | — | 必填。 |
-| `--device <ID>` | `POC_MCP_DEVICE_ID` | — | 預設機器。token 只綁一台時可省略。 |
+| `--token <TOKEN>` | `POC_MCP_TOKEN` | — | 不給就用瀏覽器登入。 |
+| `--device <ID>` | `POC_MCP_DEVICE_ID` | — | 預設機器。只有一台時可省略。 |
 | `--profile <full\|core>` | `POC_MCP_PROFILE` | `full` | `core` 只留截圖與操控相關的 12 個 tool。 |
 | `--readonly` | `POC_MCP_READONLY` | 關 | 隱藏所有會改動機器的 tool。 |
 | `--unsafe-raw` | `POC_MCP_UNSAFE_RAW` | 關 | 開放 `send_raw_message`。 |
 | `--idle-timeout <秒>` | `POC_MCP_IDLE_TIMEOUT` | `1800` | 這麼久沒有 tool 呼叫就斷線。`0` = 永不主動斷。 |
 | `--screenshot-max-edge <px>` | `POC_MCP_SCREENSHOT_MAX_EDGE` | `1024` | 截圖長邊縮到這個大小。`0` = 原生解析度。 |
-| — | `POC_ENV` | `dev` | 要連的環境。app.cloudphonego.com 產生的 token 一定要設 `prod`，不然會出現 Malformed token。 |
+| — | `POC_ENV` | `prod` | 要連的環境。只有測試站才要設 `dev`。 |
 | `--api-base <URL>` | `POC_MCP_API_BASE` | 依 `POC_ENV` | 覆寫後端位址。 |
 | `--inspector` | `POC_MCP_INSPECTOR` | 關 | 開本機的 inspector 頁面，見下。 |
 | `--inspector-port <PORT>` | `POC_MCP_INSPECTOR_PORT` | `7333` | Inspector 的埠號，只綁 127.0.0.1。 |
@@ -177,7 +211,9 @@ header。
 
 | 訊息 | 意思與處理 |
 | :--- | :--- |
-| `[token_expired] Your PhoneOnCloud MCP token expired on …` | 到 AI / MCP 面板重新產生一個，並更新設定檔。 |
+| `PhoneOnCloud sign-in required. … <連結>` | 打開連結、登入、按允許，再叫 AI 重試。 |
+| `The sign-in request was declined` / `sign-in link expired` | 再呼叫一次，會拿到新的連結。 |
+| `[token_expired] Your PhoneOnCloud MCP token expired on …` | 用 `--token` 時：到 AI / MCP 面板重新產生一個，並更新設定檔。瀏覽器登入的會自動重新登入。 |
 | `[token_revoked] This token was revoked.` | 已被撤銷，請重新產生。 |
 | `[token_invalid] Malformed token.` | 複製時被截斷了。必須以 `poc_mcp_` 開頭、中間有兩個點。 |
 | `[device_not_running] Device … is stop.` | 先到 dashboard 把機器開起來。 |
@@ -200,8 +236,10 @@ stdout 只走 JSON-RPC，不會有別的東西。
   **執行自動化腳本**、**安裝 App**、**讀寫檔案**這三個請取消勾選——這三個加起來
   等於機器的完整控制權。
 - 只想讓 AI 看、不要它動手，就加 `--readonly`。
-- Token 會存在你的 MCP 工具放設定的地方。Claude Desktop 用 OS keychain；
-  其他工具可能是專案裡的一個明文檔案。建議用環境變數 `POC_MCP_TOKEN`，
+- 瀏覽器登入的 token 存在 `~/.config/phoneoncloud/mcp-prod.json`（只有你自己能讀）。
+  登入頁上只在你剛剛自己啟動 AI 工具、代碼也對得上時才按允許。
+- 用 `--token` 時，token 會存在你的 MCP 工具放設定的地方。Claude Desktop 用 OS
+  keychain；其他工具可能是專案裡的一個明文檔案。建議用環境變數 `POC_MCP_TOKEN`，
   不要把值寫進會被 commit 的檔案。
 - 不用的 token 請到 AI / MCP 面板撤銷。
 
