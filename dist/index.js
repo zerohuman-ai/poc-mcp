@@ -8445,7 +8445,7 @@ var require_client = __commonJS({
           });
           this.dc = pc.createDataChannel("control");
           this.setupDataChannel(generation);
-          const transceiver = pc.addTransceiver("video", { direction: "recvonly" });
+          const transceiver = pc.addTransceiver("video", { direction: this.videoEnabled ? "recvonly" : "inactive" });
           if (this.videoEnabled) {
             this.videoPipeline = new videoPipeline_1.VideoPipeline((c) => this._onVideoChunk.fire(c));
             this.videoPipeline.attach(transceiver);
@@ -28918,7 +28918,7 @@ function registerScriptTools(ctx) {
 
 // src/server.ts
 var SERVER_NAME = "phoneoncloud";
-var SERVER_VERSION = "0.3.3";
+var SERVER_VERSION = "0.3.4";
 var CORE_TOOLS = /* @__PURE__ */ new Set([
   "screenshot",
   "get_screen_size",
