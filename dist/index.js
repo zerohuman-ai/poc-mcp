@@ -7444,8 +7444,9 @@ var require_protocol = __commonJS({
       /**
        * 截圖（回傳 base64 影像，預設 WebP）。成功終端是 imageChunk 收齊；每塊到達
        * 重置 timeout。失敗（go-service 截圖失敗）回 getImageResponse+error → reject。
+       * 30s：掉包時 SCTP 重傳退避會讓 chunk 之間停十幾秒，10s 會把還在傳的圖判死。
        */
-      getImage(data, timeoutMs = 1e4) {
+      getImage(data, timeoutMs = 3e4) {
         return this.request("getImage", "getImage", data, void 0, timeoutMs);
       }
       /**
@@ -8229,6 +8230,7 @@ var require_client = __commonJS({
     var DEFAULT_SCREEN_WIDTH = 360;
     var DEFAULT_SCREEN_HEIGHT = 640;
     var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    var SCREEN_NEUTRAL_TYPES = /* @__PURE__ */ new Set(["ping", "getImage", "getScreenSize", "getVersion", "getSystemStats", "getScreenColor"]);
     function chunkByUtf8Bytes(content, maxBytes) {
       const chunks = [];
       let current = "";
@@ -8310,6 +8312,10 @@ var require_client = __commonJS({
       _onReconnect = new emitter_1.Emitter();
       /** request/response 關聯層（檔案操作、getImage 走這裡）。 */
       protocol;
+      /** Bumped on every outbound message that may change the screen (tap, key, …). */
+      actionSeq = 0;
+      /** The screenshot in flight, shared by identical requests made before any later action. */
+      inflightImage = null;
       constructor(opts) {
         this.deviceId = opts.deviceId;
         this.getToken = opts.getToken;
@@ -8356,6 +8362,8 @@ var require_client = __commonJS({
        * protocol.ts 的 FIFO 錯位。
        */
       sendControlMessage(type, data) {
+        if (!SCREEN_NEUTRAL_TYPES.has(type))
+          this.actionSeq++;
         if (this.localSocket) {
           this.writeLocal({ type, data });
           return;
@@ -8583,7 +8591,9 @@ var require_client = __commonJS({
       setupDataChannel(generation = this.pcGeneration) {
         if (!this.dc)
           return;
+        this.actionSeq++;
         this.aggregator = new aggregator_1.ControlMessageAggregator((payload) => {
+          this.actionSeq++;
           if (this.dc)
             this.dc.send(payload);
         }, () => this.getBufferedAmount(), () => this.dc?.readyState === "open");
@@ -8743,6 +8753,7 @@ var require_client = __commonJS({
       }
       /** 直送 dc（不走 aggregator）。namespace touch/swipe/key 等單發用（CLI 不能等 batch flush）。 */
       directSend(msg) {
+        this.actionSeq++;
         if (this.localSocket) {
           this.writeLocal(msg);
           return;
@@ -8901,7 +8912,7 @@ var require_client = __commonJS({
         return this.protocol.requestOnce("getVersion", "getVersionResponse");
       }
       screen = {
-        getImage: async (options) => {
+        getImage: (options) => {
           const data = options ? {
             cropX: options.crop?.x ?? 0,
             cropY: options.crop?.y ?? 0,
@@ -8912,8 +8923,22 @@ var require_client = __commonJS({
             quality: options.quality ?? 0,
             ...options.format ? { format: options.format } : {}
           } : void 0;
-          const b64 = await this.protocol.getImage(data);
-          return Buffer.from(b64, "base64");
+          const key = JSON.stringify(data ?? null);
+          const cur = this.inflightImage;
+          if (cur && cur.key === key && cur.seq === this.actionSeq)
+            return cur.promise;
+          const entry = {
+            key,
+            seq: this.actionSeq,
+            promise: this.protocol.getImage(data).then((b64) => Buffer.from(b64, "base64"))
+          };
+          this.inflightImage = entry;
+          const clear = () => {
+            if (this.inflightImage === entry)
+              this.inflightImage = null;
+          };
+          entry.promise.then(clear, clear);
+          return entry.promise;
         },
         size: async () => {
           const size = await this.protocol.requestOnce("getScreenSize", "getScreenSizeResponse");
@@ -9122,9 +9147,9 @@ var require_image_data = __commonJS({
   }
 });
 
-// cwasm-webp:/home/coder/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js
+// cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js
 var require_webp = __commonJS({
-  "cwasm-webp:/home/coder/offwork/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
+  "cwasm-webp:/home/coder/go/src/github.com/onepiece-king/phoneoncloud/node_modules/@cwasm/webp/index.js"(exports) {
     var fs = __require("fs");
     var path2 = __require("path");
     var ImageData = require_image_data();
@@ -27319,6 +27344,8 @@ var ConnectionManager = class {
   pingFailures = 0;
   /** When the last pong came back. null until the first one.  */
   lastPongAt = null;
+  /** When a reply (pong, chunk, *Response) last arrived. A late pong is not a dead peer. */
+  lastInboundAt = 0;
   /** Cached device list, so screen-size lookups don't re-hit the backend. */
   deviceCache = null;
   constructor(opts) {
@@ -27459,6 +27486,10 @@ ${list}`
       );
     });
     client.onMessage((msg) => {
+      const type = msg.type;
+      if (typeof type === "string" && (type === "pong" || type === "imageChunk" || type === "readFileChunk" || type.endsWith("Response"))) {
+        this.lastInboundAt = Date.now();
+      }
       if (msg.type === "scriptRunning") {
         this.logs.push(
           "device",
@@ -27521,6 +27552,10 @@ ${list}`
         this.pingFailures = 0;
       }).catch(() => {
         this.lastRttMs = null;
+        if (Date.now() - this.lastInboundAt < PING_INTERVAL_MS) {
+          this.pingFailures = 0;
+          return;
+        }
         this.pingFailures += 1;
         if (this.pingFailures >= MAX_PING_FAILURES) {
           const silentMs = this.pingFailures * PING_INTERVAL_MS;
@@ -27557,6 +27592,7 @@ ${list}`
     this.lastRttMs = null;
     this.pingFailures = 0;
     this.lastPongAt = null;
+    this.lastInboundAt = 0;
     if (!client) return;
     this.logs.push("connection", "info", `Disconnecting: ${reason}`);
     try {
@@ -29261,7 +29297,7 @@ function registerScriptTools(ctx) {
 
 // src/server.ts
 var SERVER_NAME = "phoneoncloud";
-var SERVER_VERSION = "0.4.0";
+var SERVER_VERSION = "0.4.1";
 var CORE_TOOLS = /* @__PURE__ */ new Set([
   "screenshot",
   "get_screen_size",
